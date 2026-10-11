@@ -1,0 +1,19 @@
+control_rate_hz: 15
+action_horizon: 50
+async_prefetch_step: 16
+requery_step: 20
+rtc:
+  execution_horizon: 10
+  initial_inference_delay_steps: 3
+  maximum_inference_delay_steps: 4
+  maximum_guidance_weight: 10.0
+  prefix_attention_schedule: exp
+smoothing:
+  crossfade_steps: 4
+  ema_alpha: 0.36
+  excluded_ema_dimensions: [7, 15]
+gripper:
+  low_threshold: 20.0
+  high_threshold: 60.0
+  debounce_steps: 7
+  reversal_lock_steps: 7

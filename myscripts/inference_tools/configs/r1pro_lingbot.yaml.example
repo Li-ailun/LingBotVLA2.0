@@ -1,0 +1,7 @@
+# Replace only after training. These assets must describe the same R1Pro 20D order.
+model_path: /ABS/PATH/TO/TRAINED_LINGBOT_CHECKPOINT
+qwen_path: /ABS/PATH/TO/QWEN3_VL
+robot_config_path: /ABS/PATH/TO/R1PRO_ROBOT_CONFIG.yaml
+norm_stats_path: /ABS/PATH/TO/MATCHING_R1PRO_NORM_STATS.json
+camera_keys: [cam_high, cam_left_wrist, cam_right_wrist]
+state_action_order: right_arm7,right_gripper1,left_arm7,left_gripper1,torso4

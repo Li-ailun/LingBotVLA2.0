@@ -1,0 +1,12 @@
+{
+  "sources": [
+    {
+      "repository": "/home/lixiang/PROJECT/LingBotVLA2.0/lingbot-vla-v2",
+      "commit": "be969b8fd117fb70550c5d4bf4bc328211b5b1b6",
+      "source": "/home/lixiang/PROJECT/LingBotVLA2.0/lingbot-vla-v2/deploy/lingbot_vla_v2_policy.py",
+      "copied": "official_lingbot_vla_v2_policy.py",
+      "source_sha256": "ede2f532ea9cf06acd49fadb6915c5b8da2caa09dbd342cfb82754f182f386d2",
+      "copy_sha256": "ede2f532ea9cf06acd49fadb6915c5b8da2caa09dbd342cfb82754f182f386d2"
+    }
+  ]
+}

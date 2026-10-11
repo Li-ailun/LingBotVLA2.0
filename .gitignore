@@ -1,0 +1,82 @@
+# Local agent/account metadata (may contain machine-specific or sensitive data)
+/.agents/
+/.aws/
+/.codex/
+
+# Python caches, test output, and build products
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+*.egg-info/
+build/
+dist/
+
+# Local Python environments
+/.venv/
+/.venv_modelscope_download/
+/venv/
+/.env
+/.env.*
+!/.env.example
+
+# Downloaded models, checkpoints, and datasets
+/models/
+/RoboTwin2_data/
+/baseline_base_model_adapter/checkpoints/
+**/checkpoints/
+**/policy/weights/
+
+# RoboTwin downloaded assets. Keep the small upstream documentation assets.
+/RoboTwin_lingbot/assets/*
+!/RoboTwin_lingbot/assets/_download.py
+!/RoboTwin_lingbot/assets/files/
+!/RoboTwin_lingbot/assets/files/50_tasks.gif
+!/RoboTwin_lingbot/assets/files/domain_randomization.png
+/RoboTwin_lingbot/data/
+/RoboTwin_lingbot/envs/curobo/
+
+# Evaluation, training, and visualization outputs
+/result/
+/**/results/
+/**/eval_result/
+/**/eval_results/
+/**/eval_video/
+/evaluation/video_comparison/
+
+# Runtime files and logs
+*.log
+*.pid
+*.pids
+inference_pids.txt
+eval_pids.txt
+rtc_trace.jsonl
+
+# Generated media and archives
+*.mp4
+*.avi
+*.mkv
+*.webm
+*.zip
+*.tar
+*.tar.gz
+*.tgz
+*.7z
+
+# IDE / OS files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*~
+*.swp
+*.swo
+
+# Recoverable Git metadata from the two vendored upstream repositories
+/lingbot-vla-v2/.git.upstream-backup/
+/RoboTwin_lingbot/.git.upstream-backup/

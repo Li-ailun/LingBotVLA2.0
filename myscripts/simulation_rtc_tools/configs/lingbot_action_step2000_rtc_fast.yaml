@@ -1,0 +1,14 @@
+chunk_horizon: 50
+request_index: 10
+fixed_delay_steps: 10
+execution_horizon: 10
+rtc:
+  max_guidance_weight: 10.0
+  prefix_attention_schedule: exp
+smoothing:
+  crossfade_steps: 4
+  ema_alpha: 0.36
+fallback:
+  inference_not_ready: pause_simulation
+  request_failure: fail_episode
+  request_timeout_s: 120.0

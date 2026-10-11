@@ -1,0 +1,16 @@
+data:
+  datasets_type: vla
+  data_name: robotwin
+  robot_name: robotwin
+  train_path: /home/lixiang/PROJECT/LingBotVLA2.0/RoboTwin2_data/lerobot_dataset/RoboTwin_lerobot_v30
+  robot_config_root: /home/lixiang/PROJECT/LingBotVLA2.0/lingbot-vla-v2/configs/robot_configs
+  norm_path: /home/lixiang/PROJECT/LingBotVLA2.0/baseline_base_model_adapter/assets/norm_stats/robotwin_clean_50x50.json
+  num_workers: 8
+  prompt_type: global
+  data_ratio_for_norm_compute: 1.0
+  norm_merge_chunk_dim: true
+
+train:
+  micro_batch_size: 48
+  output_dir: /home/lixiang/PROJECT/LingBotVLA2.0/baseline_base_model_adapter/tmp
+  max_steps: 100000000000000
