@@ -18,8 +18,8 @@ python3 -m py_compile "$TOOL"/simulation_rtc/*.py "$TOOL/server/policy_server_rt
 
 printf '%s  %s\n' \
   2fb48570fab1a0c5d7667215966bcd468cd24d7ad556a92303e68cc88f87ee8e "$ROOT/RoboTwin_lingbot/script/eval_policy_client_lingbotvla.py" \
-  f48774adea86c189ce42c97c733da7d672ef500792f993ba6d750f31ab394662 "$ROOT/evaluation/lingbot_action_step2000/policy_server.py" \
-  441e1b06c690b7414306ee7b6badcccbf024bf378dd577555fe6f8db1d4ea01f "$ROOT/evaluation/lingbot_action_step2000/run_eval.sh" | sha256sum -c -
+  ff74c9726e722416c9c7a57d88f7be855e848b4258f8828108e8c64f8e38b032 "$ROOT/evaluation/lingbot_action_step2000/policy_server.py" \
+  26b0b21ba38e5cceeeaabdad68f886dea9b9e8c7734f3259df1b426e23b550a9 "$ROOT/evaluation/lingbot_action_step2000/run_eval.sh" | sha256sum -c -
 
 bash "$HERE/run_rtc_fast_one_task.sh" lift_pot --dry-run >/dev/null
 bash "$HERE/run_rtc_fast_50x50.sh" --dry-run >/dev/null

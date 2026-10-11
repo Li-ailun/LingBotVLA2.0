@@ -23,7 +23,10 @@ from lingbotvla.models.vla.lingbot_vla.configuration_lingbot_vla import LingbotV
 class ExportedCheckpointServer(LingbotVLAv2Server):
     def load_vla(self, path_to_pi_model):
         checkpoint = Path(path_to_pi_model).resolve()
-        training_config_path = checkpoint / "training/robotwin_clean_head.yaml"
+        asset_root = Path(os.environ.get("LINGBOT_MODEL_ASSET_ROOT", checkpoint)).resolve()
+        training_config_path = Path(os.environ.get(
+            "LINGBOT_TRAINING_CONFIG", asset_root / "training/robotwin_clean_head.yaml"
+        )).resolve()
         with training_config_path.open("r", encoding="utf-8") as stream:
             training_config = yaml.safe_load(stream)
 
@@ -31,14 +34,17 @@ class ExportedCheckpointServer(LingbotVLAv2Server):
         data = dict(training_config["data"])
         data["joints"] = [repr(item) if isinstance(item, dict) else item for item in data["joints"]]
         data["norm_type"] = [repr(item) if isinstance(item, dict) else item for item in data["norm_type"]]
-        data["norm_stats_file"] = str(checkpoint / "assets/norm_stats/robotwin_clean.json")
+        data["norm_stats_file"] = str(Path(os.environ.get(
+            "LINGBOT_NORM_STATS", asset_root / "assets/norm_stats/robotwin_clean.json"
+        )).resolve())
 
         model_values = dict(training_config["model"])
         train_values = dict(training_config["train"])
         model_values.update(train_values)
         align = model_values.get("align_params", {})
-        base_assets = checkpoint.parent / "lingbot-vla-v2-6b"
-        depth_assets = checkpoint.parent / "depth/moge-2-vitb-normal/model.pt"
+        models_root = Path(os.environ.get("LINGBOT_MODELS_ROOT", checkpoint.parent)).resolve()
+        base_assets = models_root / "lingbot-vla-v2-6b"
+        depth_assets = models_root / "depth/moge-2-vitb-normal/model.pt"
         if "depth" in align:
             align["depth"]["moge_path"] = str(depth_assets)
             align["depth"]["morgbd_path"] = str(base_assets / "depth/model.pt")
@@ -71,7 +77,9 @@ class ExportedCheckpointServer(LingbotVLAv2Server):
             self.vla.model.qwenvl_with_expert = torch.compile(self.vla.model.qwenvl_with_expert)
             self.sample_actions_fn = torch.compile(self.vla.model.sample_actions)
         self.robot_norm_path = data["norm_stats_file"]
-        self.exported_robot_config = checkpoint / "configs/robot_configs/robotwin.yaml"
+        self.exported_robot_config = Path(os.environ.get(
+            "LINGBOT_ROBOT_CONFIG", asset_root / "configs/robot_configs/robotwin.yaml"
+        )).resolve()
         return self.vla
 
     def reset(self, robo_name, path_to_pi_model=None):

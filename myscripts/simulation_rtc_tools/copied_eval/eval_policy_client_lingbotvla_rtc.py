@@ -66,7 +66,10 @@ def eval_policy(task_name, TASK_ENV, args, unused_model, st_seed, test_num=100,
     except Exception:
         pass
     config = RTCConfig.from_yaml(Path(os.environ["LINGBOT_RTC_CONFIG"]))
-    robot_config = PROJECT_ROOT / "models/lingbot_action_step2000/configs/robot_configs/robotwin.yaml"
+    asset_root = Path(os.environ["LINGBOT_MODEL_ASSET_ROOT"]).resolve()
+    robot_config = Path(os.environ.get(
+        "LINGBOT_ROBOT_CONFIG", asset_root / "configs/robot_configs/robotwin.yaml"
+    )).resolve()
     layout = RobotActionLayout.from_yaml(robot_config)
     trace_path = Path(usr_args["output_dir"]) / task_name / "rtc_trace.jsonl"
     trace = JSONLTraceWriter(trace_path)

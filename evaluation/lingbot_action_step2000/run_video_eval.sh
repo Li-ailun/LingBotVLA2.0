@@ -10,15 +10,25 @@ TASK=""
 EPISODES=50
 VIDEO_FPS=10
 DRY_RUN=false
+MODEL_NAME=step2000
+PRECISION=bf16
+RESUME_RUN_DIR=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --task) TASK="$2"; shift 2 ;;
     --episodes) EPISODES="$2"; shift 2 ;;
     --video-fps) VIDEO_FPS="$2"; shift 2 ;;
+    --model) MODEL_NAME="$2"; shift 2 ;;
+    --precision) PRECISION="$2"; shift 2 ;;
+    --resume-run-dir) RESUME_RUN_DIR="$2"; shift 2 ;;
     --dry-run) DRY_RUN=true; shift ;;
     *) echo "Unknown option: $1" >&2; exit 2 ;;
   esac
 done
+
+source "$ROOT/evaluation/model_registry.sh"
+resolve_lingbot_model "$MODEL_NAME" "$ROOT"
+resolve_lingbot_precision "$PRECISION"
 
 case "$SETTING" in
   demo_clean|demo_randomized) ;;
@@ -29,9 +39,14 @@ esac
 
 NUM_TASKS=50
 EXTRA=()
+TASK_DIR=all_tasks
 if [[ -n "$TASK" ]]; then
   NUM_TASKS=1
+  TASK_DIR="$TASK"
   EXTRA+=(--task_name "$TASK")
+fi
+if [[ -n "$RESUME_RUN_DIR" ]]; then
+  EXTRA+=(--resume_run_dir "$RESUME_RUN_DIR")
 fi
 
 unset ROBOTWIN_REALTIME_VISUALIZATION
@@ -39,20 +54,22 @@ export QWEN3VL_PATH="$ROOT/models/Qwen3-VL-4B-Instruct"
 export PYTHONPATH="$ROOT:$ROOT/lingbot-vla-v2${PYTHONPATH:+:$PYTHONPATH}"
 
 COMMAND=(bash "$HERE/video_eval_launcher/start_robotwin_video_infer_and_eval.sh"
-  --model_path "$ROOT/models/lingbot_action_step2000"
+  --model_path "$LINGBOT_MODEL_PATH"
   --inference_script evaluation/lingbot_action_step2000/policy_server.py
   --inference_workdir "$ROOT/lingbot-vla-v2/"
   --eval_workdir "$ROOT/RoboTwin_lingbot"
-  --output_base "$ROOT/evaluation/video_comparison/non_rtc/${SETTING#demo_}"
+  --output_base "$ROOT/evaluation/video_comparison/$LINGBOT_MODEL_ID/$LINGBOT_PRECISION/non_rtc/${SETTING#demo_}/$TASK_DIR"
   --conda_sh /home/lixiang/miniconda3/etc/profile.d/conda.sh
   --inference_env lingbotvla --sim_env RoboTwin
   --task_config "$SETTING" --num_tasks "$NUM_TASKS" --num_episodes "$EPISODES"
   --num_gpus 1 --num_per_gpu 1 --use_length 50
-  --use_bf16 True --use_fp32 False --use_compile True
+  --use_bf16 "$LINGBOT_USE_BF16" --use_fp32 "$LINGBOT_USE_FP32" --use_compile True
   --render_freq 0 --video_fps "$VIDEO_FPS" --video
   "${EXTRA[@]}")
 
 if $DRY_RUN; then
+  printf 'LINGBOT_MODEL_ASSET_ROOT=%q LINGBOT_NORM_STATS=%q LINGBOT_ROBOT_CONFIG=%q LINGBOT_TRAINING_CONFIG=%q ' \
+    "$LINGBOT_MODEL_ASSET_ROOT" "$LINGBOT_NORM_STATS" "$LINGBOT_ROBOT_CONFIG" "$LINGBOT_TRAINING_CONFIG"
   printf 'QWEN3VL_PATH=%q ' "$QWEN3VL_PATH"
   printf 'PYTHONPATH=%q ' "$PYTHONPATH"
   printf '%q ' "${COMMAND[@]}"

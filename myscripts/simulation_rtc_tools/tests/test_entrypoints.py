@@ -26,6 +26,43 @@ def test_batch_dry_run_defaults_to_clean_50_by_50():
     assert "demo_clean" in output
 
 
+def test_rtc_batch_selects_full5k_and_separates_results():
+    output = run(
+        "bash", str(TOOL / "scripts/run_rtc_fast_50x50.sh"),
+        "--model", "full5k", "--precision", "bf16", "--dry-run",
+    )
+    assert "checkpoints/global_step_5000/hf_ckpt" in output
+    assert "LINGBOT_MODEL_ASSET_ROOT=" in output
+    assert "models/lingbot_full_5k_6_60" in output
+    assert "results/full5k/bf16/clean" in output
+    assert "--use_bf16 True" in output
+    assert "--use_fp32 False" in output
+
+
+def test_rtc_batch_supports_fp32_and_resume_directory():
+    resume = "/tmp/full5k-rtc-resume"
+    output = run(
+        "bash", str(TOOL / "scripts/run_rtc_fast_50x50.sh"),
+        "--model", "full5k", "--precision", "fp32",
+        "--resume-run-dir", resume, "--resume-task", "place_object_stand",
+        "--initial-episode-count", "10", "--initial-success-count", "2",
+        "--start-seed", "100011", "--dry-run",
+    )
+    assert "--use_bf16 False" in output
+    assert "--use_fp32 True" in output
+    assert f"--resume_run_dir {resume}" in output
+    assert "--task_name place_object_stand" in output
+    assert "--initial_episode_count 10" in output
+    assert "--initial_success_count 2" in output
+    assert "--start_seed 100011" in output
+
+
+def test_rtc_client_uses_selected_model_asset_root():
+    text = (TOOL / "copied_eval/eval_policy_client_lingbotvla_rtc.py").read_text(encoding="utf-8")
+    assert 'Path(os.environ["LINGBOT_MODEL_ASSET_ROOT"])' in text
+    assert 'models/lingbot_action_step2000/configs/robot_configs/robotwin.yaml' not in text
+
+
 def test_one_task_dry_run_accepts_runtime_rtc_overrides():
     output = run(
         "bash", str(TOOL / "scripts/run_rtc_fast_one_task.sh"),
@@ -95,8 +132,8 @@ def test_headless_rtc_video_eval_records_without_gui_or_realtime():
     assert "--task_name click_alarmclock" in output
     assert "--num_episodes 1" in output
     assert (
-        "evaluation/video_comparison/rtc/clean/"
-        "request_10-delay_10-switch_20-horizon_10-xfade_4-ema_0p36"
+        "evaluation/video_comparison/step2000/bf16/rtc/clean/"
+        "request_10-delay_10-switch_20-horizon_10-xfade_4-ema_0p36/click_alarmclock"
     ) in output
     assert "ROBOTWIN_REALTIME_VISUALIZATION=1" not in output
 
@@ -110,10 +147,22 @@ def test_rtc_video_path_records_effective_runtime_parameters():
         "--ema-alpha", "0.21",
     )
     tag = "request_20-delay_20-switch_40-horizon_20-xfade_10-ema_0p21"
-    assert f"evaluation/video_comparison/rtc/clean/{tag}" in output
+    assert f"evaluation/video_comparison/step2000/bf16/rtc/clean/{tag}/click_alarmclock" in output
     assert f"RTC result config directory: {tag}" in output
 
 
 def test_rtc_client_installs_fresh_frame_recording_hook():
     text = (TOOL / "copied_eval/eval_policy_client_lingbotvla_rtc.py").read_text(encoding="utf-8")
     assert "install_fresh_frame_recording(TASK_ENV)" in text
+
+
+def test_full5k_rtc_video_path_identifies_model_precision_parameters_and_task():
+    output = run(
+        "bash", str(TOOL / "scripts/run_rtc_video_eval.sh"),
+        "--task", "open_microwave", "--episodes", "1",
+        "--model", "full5k", "--precision", "fp32", "--dry-run",
+    )
+    assert (
+        "evaluation/video_comparison/full5k/fp32/rtc/clean/"
+        "request_10-delay_10-switch_20-horizon_10-xfade_4-ema_0p36/open_microwave"
+    ) in output

@@ -81,3 +81,4 @@ Thumbs.db
 /lingbot-vla-v2/.git.upstream-backup/
 /RoboTwin_lingbot/.git.upstream-backup/
 /.venv-modelscope/
+/wheels/
