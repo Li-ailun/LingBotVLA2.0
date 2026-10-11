@@ -80,3 +80,4 @@ Thumbs.db
 # Recoverable Git metadata from the two vendored upstream repositories
 /lingbot-vla-v2/.git.upstream-backup/
 /RoboTwin_lingbot/.git.upstream-backup/
+/.venv-modelscope/
