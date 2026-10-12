@@ -59,6 +59,11 @@ unset ROBOTWIN_REALTIME_VISUALIZATION
 export QWEN3VL_PATH="$ROOT/models/Qwen3-VL-4B-Instruct"
 export LINGBOT_RTC_TOOL_ROOT="$TOOL"
 export LINGBOT_RTC_PROJECT_ROOT="$ROOT"
+export LINGBOT_PROJECT_ROOT="$ROOT"
+export LINGBOT_EVAL_MODE=rtc
+export LINGBOT_PROVENANCE_ENABLED=1
+export LINGBOT_EVAL_CLIENT_SOURCE="$TOOL/copied_eval/eval_policy_client_lingbotvla_rtc.py"
+export LINGBOT_EVAL_CLIENT_NAME=eval_policy_client_lingbotvla_rtc.py
 export LINGBOT_RTC_CONFIG="$TOOL/configs/lingbot_action_step2000_rtc_fast.yaml"
 
 RTC_CONFIG_PY=/home/lixiang/miniconda3/envs/point-flow-sim/bin/python

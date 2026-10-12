@@ -37,6 +37,8 @@ def test_rtc_batch_selects_full5k_and_separates_results():
     assert "results/full5k/bf16/clean" in output
     assert "--use_bf16 True" in output
     assert "--use_fp32 False" in output
+    assert "LINGBOT_EVAL_MODE=rtc" in output
+    assert "LINGBOT_PROVENANCE_ENABLED=1" in output
 
 
 def test_rtc_batch_supports_fp32_and_resume_directory():
@@ -75,6 +77,7 @@ def test_one_task_dry_run_accepts_runtime_rtc_overrides():
     )
     assert "LINGBOT_RTC_REQUEST_INDEX=10" in output
     assert "LINGBOT_RTC_EXECUTION_HORIZON=10" in output
+    assert "LINGBOT_EVAL_MODE=rtc" in output
     assert "LINGBOT_RTC_FIXED_DELAY_STEPS=5" in output
     assert "LINGBOT_RTC_CROSSFADE_STEPS=3" in output
     assert "LINGBOT_RTC_EMA_ALPHA=0.5" in output
@@ -106,7 +109,8 @@ def test_one_task_rejects_invalid_runtime_rtc_combination_before_launch():
 
 def test_local_launcher_never_targets_synchronous_client_name():
     text = (TOOL / "scripts/start_robotwin_rtc_infer_and_eval.sh").read_text(encoding="utf-8")
-    assert 'eval_client_dst="${eval_workdir}/script/eval_policy_client_lingbotvla_rtc.py"' in text
+    assert 'eval_client_name="${LINGBOT_EVAL_CLIENT_NAME:-eval_policy_client_lingbotvla_rtc.py}"' in text
+    assert 'eval_client_dst="${eval_workdir}/script/${eval_client_name}"' in text
     assert 'eval_client_dst="${eval_workdir}/script/eval_policy_client_lingbotvla.py"' not in text
     assert 'deploy_pkg_dst="${eval_workdir}/script/deploy_rtc"' in text
     assert 'deploy_pkg_dst="${eval_workdir}/script/deploy"' not in text

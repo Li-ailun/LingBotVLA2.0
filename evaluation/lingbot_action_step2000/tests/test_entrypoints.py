@@ -30,6 +30,9 @@ def test_non_rtc_selects_full5k_without_copying_checkpoint():
     assert "results/full5k/bf16/clean" in output
     assert "--use_bf16 True" in output
     assert "--use_fp32 False" in output
+    assert "eval_policy_client_lingbotvla_recording.py" in output
+    assert "LINGBOT_EVAL_MODE=non_rtc" in output
+    assert "LINGBOT_PROVENANCE_ENABLED=1" in output
 
 
 def test_non_rtc_supports_fp32_and_resume_directory():
@@ -48,6 +51,7 @@ def test_non_rtc_supports_fp32_and_resume_directory():
     assert "--initial_success_count 2" in output
     assert "--start_seed 100011" in output
     assert "--num_tasks 50" in output
+    assert "LINGBOT_PRECISION=fp32" in output
 
 
 def test_non_rtc_rejects_unknown_model():

@@ -39,6 +39,11 @@ source "$ROOT/evaluation/model_registry.sh"
 resolve_lingbot_model "$MODEL_NAME" "$ROOT"
 resolve_lingbot_precision "$PRECISION"
 MODEL="$LINGBOT_MODEL_PATH"
+export LINGBOT_EVAL_MODE=non_rtc
+export LINGBOT_PROVENANCE_ENABLED=1
+export LINGBOT_EVAL_CLIENT_SOURCE="$HERE/copied_eval/eval_policy_client_lingbotvla_recording.py"
+export LINGBOT_EVAL_CLIENT_NAME=eval_policy_client_lingbotvla_recording.py
+export LINGBOT_PROJECT_ROOT="$ROOT"
 
 NUM_TASKS=50
 EXTRA=()
@@ -62,7 +67,7 @@ if [[ -n "$RESUME_RUN_DIR" ]]; then
   [[ -n "$START_SEED" ]] && EXTRA+=(--start_seed "$START_SEED")
 fi
 
-COMMAND=(bash "$ROOT/lingbot-vla-v2/experiment/robotwin/start_robotwin_infer_and_eval.sh"
+COMMAND=(bash "$ROOT/myscripts/simulation_rtc_tools/scripts/start_robotwin_rtc_infer_and_eval.sh"
   --model_path "$MODEL"
   --inference_script evaluation/lingbot_action_step2000/policy_server.py
   --inference_workdir "$ROOT/lingbot-vla-v2/"
@@ -81,6 +86,8 @@ if $DRY_RUN; then
     "$LINGBOT_MODEL_ASSET_ROOT" "$LINGBOT_NORM_STATS" "$LINGBOT_ROBOT_CONFIG" "$LINGBOT_TRAINING_CONFIG"
   $REALTIME && printf 'ROBOTWIN_REALTIME_VISUALIZATION=1 '
   printf 'QWEN3VL_PATH=%q ' "$QWEN3VL_PATH"
+  printf 'LINGBOT_EVAL_MODE=%q LINGBOT_PROVENANCE_ENABLED=%q LINGBOT_PRECISION=%q LINGBOT_EVAL_CLIENT_SOURCE=%q ' \
+    "$LINGBOT_EVAL_MODE" "$LINGBOT_PROVENANCE_ENABLED" "$LINGBOT_PRECISION" "$LINGBOT_EVAL_CLIENT_SOURCE"
   printf '%q ' "${COMMAND[@]}"
   printf '\n'
   exit 0

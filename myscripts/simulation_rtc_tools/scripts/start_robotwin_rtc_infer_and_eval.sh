@@ -304,6 +304,31 @@ eval_pid_file="${run_dir}/eval_pids.txt"
 stats_file="${run_dir}/stats.txt"
 echo -e "\033[36mRun directory: ${run_dir}\033[0m"
 
+# Write provenance before starting either inference or simulation. This is a
+# project-owned sidecar and does not alter RoboTwin or policy behavior.
+if [ "${LINGBOT_PROVENANCE_ENABLED:-0}" = "1" ]; then
+    provenance_args=(
+        -m evaluation.eval_provenance.cli init-run
+        --run-dir "$run_dir"
+        --task-config "$task_config"
+        --episodes "$num_episodes"
+        --action-chunk "$use_length"
+        --use-compile "$use_compile"
+        --use-bf16 "$use_bf16"
+        --model-path "$model_path"
+        --num-gpus "$num_gpus"
+        --num-servers "$num_per_gpu"
+        --eval-workdir "$eval_workdir"
+        --initial-episode-count "$initial_episode_count"
+        --initial-success-count "$initial_success_count"
+        --video-enabled "$enable_video"
+    )
+    [ -n "$start_seed" ] && provenance_args+=(--start-seed "$start_seed")
+    [ -n "$resume_run_dir" ] && provenance_args+=(--resume)
+    PYTHONPATH="${project_root}${PYTHONPATH:+:${PYTHONPATH}}" "$sim_python" "${provenance_args[@]}"
+    echo -e "\033[36mProvenance manifest: ${run_dir}/run_manifest.json\033[0m"
+fi
+
 # Result collection arrays
 declare -a result_task_names=()
 declare -a result_durations=()
@@ -371,8 +396,9 @@ cd "$eval_workdir" || { echo -e "\033[31mError: sim workdir ${eval_workdir} miss
 # ===== Ensure the lingbot eval client is present under RoboTwin/script =====
 # The eval client resolves its ../task_config relative to its own location, so it
 # must live at <RoboTwin>/script/ for _camera_config.yml to be found.
-eval_client_src="${LINGBOT_RTC_TOOL_ROOT}/copied_eval/eval_policy_client_lingbotvla_rtc.py"
-eval_client_dst="${eval_workdir}/script/eval_policy_client_lingbotvla_rtc.py"
+eval_client_src="${LINGBOT_EVAL_CLIENT_SOURCE:-${LINGBOT_RTC_TOOL_ROOT}/copied_eval/eval_policy_client_lingbotvla_rtc.py}"
+eval_client_name="${LINGBOT_EVAL_CLIENT_NAME:-eval_policy_client_lingbotvla_rtc.py}"
+eval_client_dst="${eval_workdir}/script/${eval_client_name}"
 if [ ! -f "$eval_client_dst" ] || ! cmp -s "$eval_client_src" "$eval_client_dst"; then
     if [ ! -f "$eval_client_src" ]; then
         echo -e "\033[31mError: eval client source not found: ${eval_client_src}\033[0m"

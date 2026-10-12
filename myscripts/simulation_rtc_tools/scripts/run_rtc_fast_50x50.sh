@@ -40,7 +40,12 @@ resolve_lingbot_precision "$PRECISION"
 export QWEN3VL_PATH="$ROOT/models/Qwen3-VL-4B-Instruct"
 export LINGBOT_RTC_TOOL_ROOT="$TOOL"
 export LINGBOT_RTC_PROJECT_ROOT="$ROOT"
+export LINGBOT_PROJECT_ROOT="$ROOT"
 export LINGBOT_RTC_CONFIG="$TOOL/configs/lingbot_action_step2000_rtc_fast.yaml"
+export LINGBOT_EVAL_MODE=rtc
+export LINGBOT_PROVENANCE_ENABLED=1
+export LINGBOT_EVAL_CLIENT_SOURCE="$TOOL/copied_eval/eval_policy_client_lingbotvla_rtc.py"
+export LINGBOT_EVAL_CLIENT_NAME=eval_policy_client_lingbotvla_rtc.py
 
 RTC_CONFIG_PY=/home/lixiang/miniconda3/envs/point-flow-sim/bin/python
 RTC_SUMMARY=$(PYTHONPATH="$TOOL:$ROOT" "$RTC_CONFIG_PY" -c '
@@ -81,6 +86,7 @@ if $DRY_RUN; then
     [[ -v "$var" ]] && printf '%s=%q ' "$var" "${!var}"
   done
   printf 'LINGBOT_RTC_EVAL_CLIENT=%q ' "$TOOL/copied_eval/eval_policy_client_lingbotvla_rtc.py"
+  printf 'LINGBOT_EVAL_MODE=%q LINGBOT_PROVENANCE_ENABLED=%q ' "$LINGBOT_EVAL_MODE" "$LINGBOT_PROVENANCE_ENABLED"
   printf '%q ' "${COMMAND[@]}"
   printf '\n'
   exit 0
