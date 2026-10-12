@@ -513,7 +513,8 @@ def find_image_path(cam_dir: Path, frame_idx: int) -> Path:
 def find_episode_dirs(input_dir: Path):
     input_dir = input_dir.expanduser().resolve()
     eps = sorted([
-        p for p in input_dir.glob("episode_*")
+        p for p in input_dir.rglob("episode_*")
+        if p.is_dir()
         if (p / "state.npy").exists()
         and (p / "action.npy").exists()
         and (p / "images").exists()
@@ -609,7 +610,7 @@ def read_task(ep_dir: Path):
     if task_file.exists():
         task = task_file.read_text().strip()
         if task:
-            return normalize_task_label(task)
+            return task
 
     meta_file = ep_dir / "episode_meta.json"
     if meta_file.exists():
@@ -617,7 +618,7 @@ def read_task(ep_dir: Path):
             meta = json.loads(meta_file.read_text())
             task = str(meta.get("task", "")).strip()
             if task:
-                return normalize_task_label(task)
+                return task
         except Exception:
             pass
 

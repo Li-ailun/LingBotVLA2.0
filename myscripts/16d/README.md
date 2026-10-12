@@ -22,6 +22,35 @@ source /opt/ros/humble/setup.bash
   --task "pick_up_object"
 ```
 
+### 三类盘子/杯子任务
+
+脚本内置三条固定英文指令。直接运行且不传 `--task` 时，会提示选择 `1/2/3`；也可以在命令行指定：
+
+```bash
+/usr/bin/python3 myscripts/16d/record_tools/record_r1pro_mcap_episode.py \
+  --root "$PWD/datasets/r1pro_mcap_raw" \
+  --instruction-id 1
+```
+
+三个编号分别表示：
+
+1. 蓝、粉盘子；蓝、红、黄杯子。
+2. 蓝、粉盘子；红、黄、蓝杯子。
+3. 粉、蓝盘子；黄、蓝、红杯子。
+
+颜色顺序是放置顺序（从下到上）。共同流程为：从随机初始布局中先将两个盘子叠到左侧，再将三个杯子叠到右侧，最后把完整杯子堆放到盘子堆上。Qwen3-VL对话模板下每条英文指令均为41 tokens，低于72-token上限。
+
+等待开始下一条episode时，可输入 `1`、`2` 或 `3` 切换指令。数据自动分类为：
+
+```text
+datasets/r1pro_mcap_raw/stack_plates_and_cups/
+├── stack_plates_cups_01/episode_*/
+├── stack_plates_cups_02/episode_*/
+└── stack_plates_cups_03/episode_*/
+```
+
+每个episode的 `record_config.json` 同时记录 `task_id`、`instruction_id`、完整 `instruction_text` 和 `language`；`task.txt` 保存模型实际读取的完整英文指令。
+
 固定录制11个话题：三路RGB图像、左右臂关节反馈、左右夹爪反馈、左右臂关节目标和左右夹爪目标。
 
 交互流程：
@@ -57,6 +86,17 @@ source /opt/ros/humble/setup.bash
 每个 episode 生成 `state.npy [N,16]`、`action.npy [N,16]`、`timestamps.npy`、三路图像、
 `episode_meta.json` 和逐帧拒绝记录。旧 bag 中即使包含腰部话题也不会被读取。
 
+盘子/杯子任务可以一次递归转换全部三个指令目录，并保留分类层级：
+
+```bash
+/usr/bin/python3 myscripts/16d/convert_tools/export_r1pro_mcap_to_intermediate.py \
+  --input "$PWD/datasets/r1pro_mcap_raw/stack_plates_and_cups" \
+  --output "$PWD/datasets/r1pro_intermediate_16d/stack_plates_and_cups" \
+  --fps 15 \
+  --max-image-dt 0.12 \
+  --max-vec-dt 0.20
+```
+
 ## 3. 构建 LeRobot v2.1
 
 该脚本沿用原20D工具所使用的 OpenPI Python/LeRobot v2.1环境：
@@ -75,6 +115,17 @@ export HF_LEROBOT_HOME="$PWD/datasets/lerobot"
 
 构建器会严格检查16维、有限值、state/action/timestamp帧数一致性，并在数据集 `meta/` 下写入
 `r1pro_schema.json`。传入20D旧数据会直接报错。
+
+构建器会递归读取三个指令子目录，将每个episode的完整英文 `instruction_text` 写入LeRobot任务字段：
+
+```bash
+/home/lixiang/PROJECT/openpi/.venv/bin/python \
+  myscripts/16d/convert_tools/build_lerobot_from_r1pro_intermediate.py \
+  --input "$PWD/datasets/r1pro_intermediate_16d/stack_plates_and_cups" \
+  --repo-id lixiang/stack_plates_and_cups_16d \
+  --fps 15 \
+  --overwrite
+```
 
 ## 4. 数据审计与曲线
 

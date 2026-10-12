@@ -39,3 +39,40 @@ def test_builder_rejects_legacy_20d_intermediate() -> None:
     result = subprocess.run([PYTHON, "-c", code], capture_output=True, text=True)
     assert result.returncode != 0
     assert "expected final dimension 16, got 20" in result.stderr
+
+
+def test_builder_uses_full_natural_language_instruction(tmp_path: Path) -> None:
+    episode = tmp_path / "episode_000001"
+    episode.mkdir()
+    instruction = "Stack the pink plate and then the blue plate on the left."
+    (episode / "task.txt").write_text(instruction + "\n", encoding="utf-8")
+    code = (
+        "import importlib.util;"
+        f"s=importlib.util.spec_from_file_location('builder',{str(SCRIPT)!r});"
+        "m=importlib.util.module_from_spec(s);s.loader.exec_module(m);"
+        f"print(m.read_task(m.Path({str(episode)!r})))"
+    )
+    result = subprocess.run([PYTHON, "-c", code], capture_output=True, text=True)
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.strip() == instruction
+
+
+def test_builder_discovers_nested_instruction_episodes(tmp_path: Path) -> None:
+    for instruction_id in ("stack_plates_cups_01", "stack_plates_cups_03"):
+        episode = tmp_path / instruction_id / "episode_000000"
+        (episode / "images").mkdir(parents=True)
+        (episode / "state.npy").write_bytes(b"placeholder")
+        (episode / "action.npy").write_bytes(b"placeholder")
+    code = (
+        "import importlib.util,json;"
+        f"s=importlib.util.spec_from_file_location('builder',{str(SCRIPT)!r});"
+        "m=importlib.util.module_from_spec(s);s.loader.exec_module(m);"
+        f"r=m.Path({str(tmp_path)!r});"
+        "print(json.dumps([str(p.relative_to(r)) for p in m.find_episode_dirs(r)]))"
+    )
+    result = subprocess.run([PYTHON, "-c", code], capture_output=True, text=True)
+    assert result.returncode == 0, result.stderr
+    assert json.loads(result.stdout) == [
+        "stack_plates_cups_01/episode_000000",
+        "stack_plates_cups_03/episode_000000",
+    ]

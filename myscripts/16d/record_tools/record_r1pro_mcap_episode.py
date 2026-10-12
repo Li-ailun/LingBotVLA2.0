@@ -23,6 +23,7 @@ import sys
 import termios
 from pathlib import Path
 from collections import deque
+from typing import NamedTuple
 
 # ======================================================================================
 # Terminal colors: only affects printed text, not recording logic.
@@ -158,6 +159,73 @@ def safe_task_dir_name(task: str) -> str:
         safe = safe.replace("__", "_")
     safe = safe.strip("._-")
     return safe[:120] if safe else "untitled_task"
+
+
+class InstructionSpec(NamedTuple):
+    task_id: str
+    instruction_id: str
+    text: str
+    language: str = "en"
+
+
+PLATE_CUP_INSTRUCTIONS = {
+    "stack_plates_cups_01": InstructionSpec(
+        "stack_plates_and_cups",
+        "stack_plates_cups_01",
+        "Stack the blue plate and then the pink plate on the left. "
+        "Stack the blue, red, and yellow cups on the right. "
+        "Finally, place the cup stack on the plates.",
+    ),
+    "stack_plates_cups_02": InstructionSpec(
+        "stack_plates_and_cups",
+        "stack_plates_cups_02",
+        "Stack the blue plate and then the pink plate on the left. "
+        "Stack the red, yellow, and blue cups on the right. "
+        "Finally, place the cup stack on the plates.",
+    ),
+    "stack_plates_cups_03": InstructionSpec(
+        "stack_plates_and_cups",
+        "stack_plates_cups_03",
+        "Stack the pink plate and then the blue plate on the left. "
+        "Stack the yellow, blue, and red cups on the right. "
+        "Finally, place the cup stack on the plates.",
+    ),
+}
+INSTRUCTION_ALIASES = {
+    "1": "stack_plates_cups_01",
+    "2": "stack_plates_cups_02",
+    "3": "stack_plates_cups_03",
+    **{key: key for key in PLATE_CUP_INSTRUCTIONS},
+}
+
+
+def resolve_instruction(value: str) -> InstructionSpec:
+    key = INSTRUCTION_ALIASES.get(str(value).strip().lower())
+    if key is None:
+        choices = ", ".join(sorted(INSTRUCTION_ALIASES))
+        raise ValueError(f"Unknown instruction {value!r}; choose one of: {choices}")
+    return PLATE_CUP_INSTRUCTIONS[key]
+
+
+def instruction_path_parts(spec: InstructionSpec) -> list[str]:
+    return [safe_task_dir_name(spec.task_id), safe_task_dir_name(spec.instruction_id)]
+
+
+def apply_instruction(args, value: str) -> InstructionSpec:
+    spec = resolve_instruction(value)
+    args.task = spec.text
+    args.task_id = spec.task_id
+    args.instruction_id = spec.instruction_id
+    args.instruction_text = spec.text
+    args.language = spec.language
+    return spec
+
+
+def task_directory(root: Path, args) -> Path:
+    if getattr(args, "instruction_id", None):
+        spec = resolve_instruction(args.instruction_id)
+        return root.joinpath(*instruction_path_parts(spec))
+    return root / safe_task_dir_name(args.task)
 
 
 def now_stamp_ms() -> str:
@@ -804,6 +872,10 @@ def write_episode_config(
 
     config = {
         "task": args.task,
+        "task_id": args.task_id,
+        "instruction_id": args.instruction_id,
+        "instruction_text": args.instruction_text,
+        "language": args.language,
         "schema": "r1pro_dual_arm_16d_left_first_v1",
         "safe_task_dir_name": safe_task_dir_name(args.task),
         "episode_index": episode_index,
@@ -1186,7 +1258,7 @@ def record_one_episode(
 
 def run_manual_loop(args):
     root = Path(args.root).expanduser().resolve()
-    task_dir = root / safe_task_dir_name(args.task)
+    task_dir = task_directory(root, args)
     task_dir.mkdir(parents=True, exist_ok=True)
 
     topics = r1pro_16d_core_topics()
@@ -1256,7 +1328,8 @@ def run_manual_loop(args):
             cmd = input(
                 color_text(
                     f"\n[MANUAL] Ready. Press ENTER to {action_word} "
-                    f"episode_{episode_index:06d}, or type q then ENTER to quit: ",
+                    f"episode_{episode_index:06d}; type 1/2/3 to switch instruction; "
+                    f"or q to quit: ",
                     COLOR_YELLOW,
                 )
             ).strip().lower()
@@ -1264,6 +1337,17 @@ def run_manual_loop(args):
             if cmd in {"q", "quit", "exit"}:
                 print("[MANUAL] Quit requested.")
                 break
+
+            if cmd in INSTRUCTION_ALIASES:
+                spec = apply_instruction(args, cmd)
+                task_dir = task_directory(root, args)
+                task_dir.mkdir(parents=True, exist_ok=True)
+                episode_index = get_next_episode_index(task_dir)
+                print(color_text(
+                    f"[MANUAL] Switched to {spec.instruction_id}: {spec.text}",
+                    COLOR_GREEN,
+                ))
+                continue
 
             success = record_one_episode(
                 node=node,
@@ -1297,8 +1381,11 @@ def main():
     parser.add_argument(
         "--task",
         type=str,
-        required=True,
-        help="Current task instruction. Used for directory and task.txt/record_config.json.",
+        help="Generic task instruction. Mutually exclusive with --instruction-id.",
+    )
+    parser.add_argument(
+        "--instruction-id",
+        help="Plate/cup instruction: 1, 2, 3, or stack_plates_cups_01..03.",
     )
     parser.add_argument("--episode-index", type=str, default="auto")
 
@@ -1371,6 +1458,26 @@ def main():
     parser.add_argument("--warmup-timeout", type=float, default=10.0)
 
     args = parser.parse_args()
+    if args.task and args.instruction_id:
+        parser.error("--task and --instruction-id are mutually exclusive")
+    if args.instruction_id:
+        try:
+            apply_instruction(args, args.instruction_id)
+        except ValueError as exc:
+            parser.error(str(exc))
+    elif args.task:
+        args.task_id = safe_task_dir_name(args.task)
+        args.instruction_id = None
+        args.instruction_text = args.task
+        args.language = "unspecified"
+    else:
+        if not sys.stdin.isatty():
+            parser.error("provide --task or --instruction-id")
+        print("Select plate/cup instruction: 1, 2, or 3")
+        try:
+            apply_instruction(args, input("instruction> ").strip())
+        except ValueError as exc:
+            parser.error(str(exc))
     if args.enable_timestamp_monitor:
         if args.precheck_stable_sec < 0:
             parser.error("--precheck-stable-sec must be >= 0")

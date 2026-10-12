@@ -476,36 +476,43 @@ def find_episode_dirs(input_path: Path):
     if (input_path / "bag").exists():
         return [input_path]
 
-    eps = sorted([p for p in input_path.glob("episode_*") if (p / "bag").exists()])
-    if eps:
-        return eps
-
-    eps = sorted([p for p in input_path.glob("*/*") if p.name.startswith("episode_") and (p / "bag").exists()])
+    eps = sorted(
+        p for p in input_path.rglob("episode_*")
+        if p.is_dir() and (p / "bag").exists()
+    )
     if eps:
         return eps
 
     raise RuntimeError(f"No episode_*/bag directories found under: {input_path}")
 
 
-def read_task(episode_dir: Path) -> str:
-    task_file = episode_dir / "task.txt"
-    if task_file.exists():
-        task = task_file.read_text().strip()
-        if task:
-            return normalize_task_label(task)
-
-    # fallback: try record_config.json
+def read_episode_instruction_metadata(episode_dir: Path) -> dict:
+    cfg = {}
     cfg_file = episode_dir / "record_config.json"
     if cfg_file.exists():
         try:
-            cfg = json.loads(cfg_file.read_text())
-            task = str(cfg.get("task", "")).strip()
-            if task:
-                return normalize_task_label(task)
+            cfg = json.loads(cfg_file.read_text(encoding="utf-8"))
         except Exception:
-            pass
+            cfg = {}
 
-    return "unknown_task"
+    task_file = episode_dir / "task.txt"
+    if task_file.exists():
+        task = task_file.read_text(encoding="utf-8").strip()
+    else:
+        task = ""
+    task = task or str(cfg.get("instruction_text") or cfg.get("task") or "").strip()
+    task = task or "unknown_task"
+    return {
+        "task": task,
+        "task_id": str(cfg.get("task_id") or "").strip() or normalize_task_label(task),
+        "instruction_id": str(cfg.get("instruction_id") or "").strip() or None,
+        "instruction_text": str(cfg.get("instruction_text") or "").strip() or task,
+        "language": str(cfg.get("language") or "").strip() or "unspecified",
+    }
+
+
+def read_task(episode_dir: Path) -> str:
+    return read_episode_instruction_metadata(episode_dir)["task"]
 
 
 def write_image_payload(path: Path, payload):
@@ -514,7 +521,8 @@ def write_image_payload(path: Path, payload):
 
 def convert_episode(episode_dir: Path, output_episode_dir: Path, args):
     bag_dir = episode_dir / "bag"
-    task = read_task(episode_dir)
+    instruction_meta = read_episode_instruction_metadata(episode_dir)
+    task = instruction_meta["task"]
 
     if output_episode_dir.exists():
         if args.overwrite:
@@ -672,6 +680,10 @@ def convert_episode(episode_dir: Path, output_episode_dir: Path, args):
         "source_episode_dir": str(episode_dir),
         "source_bag_dir": str(bag_dir),
         "task": task,
+        "task_id": instruction_meta["task_id"],
+        "instruction_id": instruction_meta["instruction_id"],
+        "instruction_text": instruction_meta["instruction_text"],
+        "language": instruction_meta["language"],
         "schema": SCHEMA_NAME,
         "frame_count": int(kept),
         "reference_camera": "cam_high",
@@ -738,7 +750,11 @@ def main():
     }
 
     for episode_dir in episode_dirs:
-        output_episode_dir = output_root / episode_dir.name
+        if episode_dir == input_path:
+            relative_episode = Path(episode_dir.name)
+        else:
+            relative_episode = episode_dir.relative_to(input_path)
+        output_episode_dir = output_root / relative_episode
         convert_episode(episode_dir, output_episode_dir, args)
         manifest["episodes"].append(
             {

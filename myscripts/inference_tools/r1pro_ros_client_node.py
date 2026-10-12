@@ -116,8 +116,8 @@ class R1ProRosOpenPIClient(Node):
         if self.policy_mode == "server":
             if websocket_client_policy is None:
                 raise RuntimeError(
-                    "Failed to import openpi_client. Use system Python for ROS, and set:\n"
-                    "export PYTHONPATH=/home/lixiang/PROJECT/RLinf/packages/openpi-client/src:$PYTHONPATH"
+                    "Failed to import the bundled websocket client. Use system Python for ROS, and set:\n"
+                    f"export PYTHONPATH={THIS_DIR}:$PYTHONPATH"
                 ) from OPENPI_CLIENT_IMPORT_ERROR
             self.get_logger().info(f"Connecting to OpenPI server ws://{args.host}:{args.port}")
             self.policy = websocket_client_policy.WebsocketClientPolicy(host=args.host, port=args.port)
@@ -1573,7 +1573,10 @@ def parse_args():
 
     parser.add_argument("--show-images", action="store_true")
     parser.add_argument("--record-debug", action="store_true")
-    parser.add_argument("--record-dir", default="/home/lixiang/PROJECT/RLinf/datasets/analysis/r1pro_policy_records/latest")
+    parser.add_argument(
+        "--record-dir",
+        default=str(THIS_DIR / "records" / "r1pro_policy_records" / "latest"),
+    )
     parser.add_argument("--record-images", action="store_true")
 
     parser.add_argument("--topic-cam-high", default=TOPIC_CAM_HIGH)

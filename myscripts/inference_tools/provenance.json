@@ -6,7 +6,8 @@
       "source": "/home/lixiang/PROJECT/RLinf/myscripts/inference_tools/r1pro_ros_client_node.py",
       "copied": "r1pro_ros_client_node.py",
       "source_sha256": "4275c3035d82467f4ba8e243316f6b107c12e2d6e49d3676143902156b489e28",
-      "copy_sha256": "4275c3035d82467f4ba8e243316f6b107c12e2d6e49d3676143902156b489e28"
+      "copy_sha256": "e6f99e131715c6d7a8c86c5f260854d4eb59955b02bed5443b9a82dacdbee357",
+      "local_modifications": "Removed RLinf runtime paths; bundled websocket client and project-local debug record directory are used."
     },
     {
       "repository": "/home/lixiang/PROJECT/RLinf",
