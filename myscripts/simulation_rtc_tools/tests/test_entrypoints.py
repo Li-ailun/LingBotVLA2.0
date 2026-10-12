@@ -59,6 +59,42 @@ def test_rtc_batch_supports_fp32_and_resume_directory():
     assert "--start_seed 100011" in output
 
 
+def test_rtc_resume_can_select_physical_gpu_explicitly():
+    output = run(
+        "bash", str(TOOL / "scripts/run_rtc_fast_50x50.sh"),
+        "--model", "full5k", "--gpu", "8",
+        "--resume-run-dir", "/tmp/run", "--resume-task", "place_object_basket",
+        "--initial-episode-count", "10", "--initial-success-count", "0",
+        "--start-seed", "100017", "--dry-run",
+    )
+    assert "--gpu_ids 8" in output
+    assert "LINGBOT_GPU_IDS=8" in output
+
+
+def test_rtc_batch_accepts_arbitrary_non_contiguous_gpu_list():
+    output = run(
+        "bash", str(TOOL / "scripts/run_rtc_fast_50x50.sh"),
+        "--model", "full5k", "--gpu-ids", "2,5,8", "--dry-run",
+    )
+    assert "--gpu_ids 2\\,5\\,8" in output
+    assert "LINGBOT_GPU_IDS=2\\,5\\,8" in output or "LINGBOT_GPU_IDS=2,5,8" in output
+
+
+def test_launcher_contains_explicit_gpu_list_mapping_and_validation():
+    text = (TOOL / "scripts/start_robotwin_rtc_infer_and_eval.sh").read_text()
+    assert "--gpu_ids" in text
+    assert 'gpu_id="${selected_gpu_ids[$((slot % num_gpus))]}"' in text
+    assert "nvidia-smi -L" in text
+
+    output = run(
+        "bash", str(TOOL / "scripts/start_robotwin_rtc_infer_and_eval.sh"),
+        "--validate_only", "--gpu_ids", "2,5,8", "--num_tasks", "3",
+        "--num_episodes", "1",
+    )
+    assert "physical_gpu_ids=2,5,8" in output
+    assert "num_gpus=3" in output
+
+
 def test_rtc_client_uses_selected_model_asset_root():
     text = (TOOL / "copied_eval/eval_policy_client_lingbotvla_rtc.py").read_text(encoding="utf-8")
     assert 'Path(os.environ["LINGBOT_MODEL_ASSET_ROOT"])' in text

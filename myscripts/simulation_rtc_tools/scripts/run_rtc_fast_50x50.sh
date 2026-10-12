@@ -15,6 +15,7 @@ RESUME_TASK=""
 INITIAL_EPISODE_COUNT=0
 INITIAL_SUCCESS_COUNT=0
 START_SEED=""
+GPU_IDS=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --dry-run) DRY_RUN=true; shift ;;
@@ -26,6 +27,8 @@ while [[ $# -gt 0 ]]; do
     --initial-episode-count) INITIAL_EPISODE_COUNT="$2"; shift 2 ;;
     --initial-success-count) INITIAL_SUCCESS_COUNT="$2"; shift 2 ;;
     --start-seed) START_SEED="$2"; shift 2 ;;
+    --gpu|--gpu-id|--gpu_id) GPU_IDS="$2"; shift 2 ;;
+    --gpu-ids|--gpu_ids) GPU_IDS="$2"; shift 2 ;;
     --request-index) export LINGBOT_RTC_REQUEST_INDEX="$2"; shift 2 ;;
     --execution-horizon) export LINGBOT_RTC_EXECUTION_HORIZON="$2"; shift 2 ;;
     --fixed-delay-steps) export LINGBOT_RTC_FIXED_DELAY_STEPS="$2"; shift 2 ;;
@@ -34,6 +37,11 @@ while [[ $# -gt 0 ]]; do
     *) echo "Unknown option: $1" >&2; exit 2 ;;
   esac
 done
+
+if [[ -n "$GPU_IDS" && ! "$GPU_IDS" =~ ^[0-9]+(,[0-9]+)*$ ]]; then
+  echo "GPU ids must be comma-separated non-negative integers: $GPU_IDS" >&2
+  exit 2
+fi
 
 source "$ROOT/evaluation/model_registry.sh"
 resolve_lingbot_model "$MODEL_NAME" "$ROOT"
@@ -66,6 +74,10 @@ if [[ -n "$RESUME_RUN_DIR" ]]; then
   EXTRA+=(--initial_success_count "$INITIAL_SUCCESS_COUNT")
   [[ -n "$START_SEED" ]] && EXTRA+=(--start_seed "$START_SEED")
 fi
+if [[ -n "$GPU_IDS" ]]; then
+  EXTRA+=(--gpu_ids "$GPU_IDS")
+  export LINGBOT_GPU_IDS="$GPU_IDS"
+fi
 
 COMMAND=(bash "$HERE/start_robotwin_rtc_infer_and_eval.sh"
   --model_path "$LINGBOT_MODEL_PATH"
@@ -88,6 +100,7 @@ if $DRY_RUN; then
     [[ -v "$var" ]] && printf '%s=%q ' "$var" "${!var}"
   done
   printf 'LINGBOT_RTC_EVAL_CLIENT=%q ' "$TOOL/copied_eval/eval_policy_client_lingbotvla_rtc.py"
+  [[ -n "$GPU_IDS" ]] && printf 'LINGBOT_GPU_IDS=%q ' "$GPU_IDS"
   printf 'LINGBOT_EVAL_MODE=%q LINGBOT_PROVENANCE_ENABLED=%q ' "$LINGBOT_EVAL_MODE" "$LINGBOT_PROVENANCE_ENABLED"
   printf '%q ' "${COMMAND[@]}"
   printf '\n'

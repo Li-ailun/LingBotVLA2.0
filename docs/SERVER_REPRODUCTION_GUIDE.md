@@ -654,17 +654,34 @@ launcher会为每个slot设置：
 CUDA_VISIBLE_DEVICES=$gpu_id
 ```
 
-高层 `run_eval.sh`、`run_rtc_fast_one_task.sh` 和
-`run_rtc_fast_50x50.sh` 当前固定为：
+高层 `run_eval.sh`、`run_video_eval.sh`、`run_rtc_fast_one_task.sh`、
+`run_rtc_fast_50x50.sh` 和 `run_rtc_video_eval.sh` 默认保持：
 
 ```text
 1 GPU × 1 server/GPU
-逻辑GPU 0
+物理GPU 0
 起始端口9330
 ```
 
-因此仅在外层执行 `CUDA_VISIBLE_DEVICES=8` 并不能可靠选择物理GPU 8，因为底层
-launcher会再次赋值。旧任务仍占用端口9330时，新任务也不能使用高层入口直接启动。
+不指定参数时，原有命令和行为完全不变。需要显式选择单张物理GPU时追加：
+
+```bash
+--gpu 8
+```
+
+需要任意多卡并行（包括非连续编号）时追加：
+
+```bash
+--gpu-ids 2,5,8
+```
+
+此时默认每张GPU启动一个推理服务，任务按slot排队分配到GPU 2、5、8。底层参数名为
+`--gpu_ids`，高层同时兼容 `--gpu-ids` 与 `--gpu_ids`。正式启动前会通过
+`nvidia-smi -L` 检查物理编号，重复、非数字或越界编号会立即报错。所选编号也会写入
+`run_manifest.json` 的 `inference.physical_gpu_ids`。
+
+不建议再依赖外层 `CUDA_VISIBLE_DEVICES=8`，因为launcher会为每个slot设置自己的
+`CUDA_VISIBLE_DEVICES`。旧任务仍占用端口9330时，新任务即使换GPU也必须避免端口冲突。
 
 在服务器上并行启动前必须检查：
 
@@ -675,8 +692,8 @@ ps -ef | grep -E 'policy_server|start_robotwin' | grep -v grep
 ```
 
 若需要指定物理GPU、改变端口或多GPU并发，当前应直接调用底层launcher并传完整
-参数，或者后续给高层wrapper增加正式的 `--gpu-ids/--start-port/--num-gpus`
-接口。不要在不清楚映射时同时启动两个使用9330的运行。
+参数以改变端口；GPU选择已经可由高层的 `--gpu`/`--gpu-ids` 完成。不要在不清楚
+端口映射时同时启动两个使用9330的运行。
 
 ## 12. 当前服务器迁移状态
 

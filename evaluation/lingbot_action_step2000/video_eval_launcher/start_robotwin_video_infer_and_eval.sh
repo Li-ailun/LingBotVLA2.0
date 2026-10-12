@@ -54,6 +54,7 @@ pid_name="test_pid"
 num_tasks=50
 num_episodes=100
 num_gpus=1
+gpu_ids=""
 num_per_gpu=1
 use_length=50
 use_bf16=False
@@ -85,6 +86,7 @@ while [[ $# -gt 0 ]]; do
         --num_tasks)         num_tasks="$2";         shift 2 ;;
         --num_episodes)      num_episodes="$2";      shift 2 ;;
         --num_gpus)          num_gpus="$2";          shift 2 ;;
+        --gpu_ids)           gpu_ids="$2";           shift 2 ;;
         --num_per_gpu)       num_per_gpu="$2";       shift 2 ;;
         --use_length)        use_length="$2";        shift 2 ;;
         --use_bf16)          use_bf16="$2";        shift 2 ;;
@@ -121,6 +123,7 @@ while [[ $# -gt 0 ]]; do
             echo "  --num_tasks         number of sim tasks (default: 50, max: 50)"
             echo "  --num_episodes      episodes per task (default: 100)"
             echo "  --num_gpus          total GPUs (default: 1)"
+            echo "  --gpu_ids           explicit physical GPU ids, comma-separated (example: 4,6)"
             echo "  --num_per_gpu       inference servers per GPU (default: 1)"
             echo "  --use_length        chunk length (default: 50)"
             echo "  --use_bf16          use bfloat16 inference (default: False)"
@@ -139,6 +142,25 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
+declare -a selected_gpu_ids=()
+if [[ -n "$gpu_ids" ]]; then
+    IFS=',' read -r -a selected_gpu_ids <<< "$gpu_ids"
+    declare -A seen_gpu_ids=()
+    for gpu_id in "${selected_gpu_ids[@]}"; do
+        [[ "$gpu_id" =~ ^[0-9]+$ ]] || {
+            echo "Error: every --gpu_ids value must be a non-negative integer: $gpu_ids" >&2; exit 1;
+        }
+        [[ -z "${seen_gpu_ids[$gpu_id]:-}" ]] || {
+            echo "Error: duplicate GPU id in --gpu_ids: $gpu_id" >&2; exit 1;
+        }
+        seen_gpu_ids[$gpu_id]=1
+    done
+    num_gpus=${#selected_gpu_ids[@]}
+else
+    for ((gpu_id=0; gpu_id<num_gpus; gpu_id++)); do selected_gpu_ids+=("$gpu_id"); done
+fi
+gpu_ids="$(IFS=,; echo "${selected_gpu_ids[*]}")"
+
 if ! [[ "$num_episodes" =~ ^[1-9][0-9]*$ ]]; then
     echo "Error: num_episodes must be a positive integer" >&2
     exit 1
@@ -147,6 +169,8 @@ fi
 if $validate_only; then
     echo "num_tasks=${num_tasks}"
     echo "num_episodes=${num_episodes}"
+    echo "num_gpus=${num_gpus}"
+    echo "physical_gpu_ids=${gpu_ids}"
     echo "client_override=--num_episodes ${num_episodes}"
     echo "task_name=${task_name}"
     echo "render_freq=${render_freq}"
@@ -156,6 +180,17 @@ if $validate_only; then
     echo "resume_run_dir=${resume_run_dir}"
     exit 0
 fi
+
+command -v nvidia-smi >/dev/null 2>&1 || {
+    echo "Error: nvidia-smi is required to validate GPU selection" >&2; exit 1;
+}
+gpu_count="$(nvidia-smi -L | awk '/^GPU [0-9]+:/{count++} END{print count+0}')"
+for gpu_id in "${selected_gpu_ids[@]}"; do
+    ((gpu_id < gpu_count)) || {
+        echo "Error: requested physical GPU $gpu_id, but nvidia-smi reports $gpu_count GPU(s)" >&2; exit 1;
+    }
+done
+export LINGBOT_GPU_IDS="$gpu_ids"
 
 
 # ===== Common environment =====
@@ -282,6 +317,7 @@ done
 num_tasks=${#task_queue[@]}
 echo -e "\033[36mTasks this run (${num_tasks}): ${task_queue[*]}\033[0m"
 echo -e "\033[36mInference config: ${num_gpus} GPU x ${num_per_gpu} servers/GPU = ${num_slots} slots\033[0m"
+echo -e "\033[36mPhysical GPU ids: ${gpu_ids}\033[0m"
 echo -e "\033[36mInference precision: use_bf16=${use_bf16}, use_fp32=${use_fp32}, use_compile=${use_compile}\033[0m"
 
 # ===== Common variables =====
@@ -318,7 +354,7 @@ echo -e "\033[32m========== Starting inference side: ${num_slots} QwenPi servers
 cd "$inference_workdir" || { echo -e "\033[31mError: inference workdir ${inference_workdir} missing\033[0m"; exit 1; }
 
 for slot in $(seq 0 $((num_slots-1))); do
-    gpu_id=$(( slot % num_gpus ))
+    gpu_id="${selected_gpu_ids[$((slot % num_gpus))]}"
     port=$(( start_port + slot ))
 
     export CUDA_VISIBLE_DEVICES=${gpu_id}
@@ -456,7 +492,7 @@ done
 launch_task() {
     local slot=$1
     local task_name=$2
-    local gpu_id=$(( slot % num_gpus ))
+    local gpu_id="${selected_gpu_ids[$((slot % num_gpus))]}"
     local port=$(( start_port + slot ))
 
     export CUDA_VISIBLE_DEVICES=${gpu_id}

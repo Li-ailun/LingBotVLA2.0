@@ -82,6 +82,7 @@ def build_metadata(args: argparse.Namespace) -> dict:
             "torch_compile": args.use_compile == "True",
             "num_gpus": args.num_gpus,
             "servers_per_gpu": args.num_servers,
+            "physical_gpu_ids": [int(value) for value in args.gpu_ids.split(",")],
         },
         "code": {
             "project_commit": _git_commit(os.environ.get("LINGBOT_PROJECT_ROOT")),
@@ -131,6 +132,7 @@ def main() -> None:
     init.add_argument("--model-path", default=None)
     init.add_argument("--num-gpus", type=int, required=True)
     init.add_argument("--num-servers", type=int, required=True)
+    init.add_argument("--gpu-ids", default="0")
     init.add_argument("--eval-workdir", default=None)
     init.add_argument("--start-seed", type=int, default=None)
     init.add_argument("--initial-episode-count", type=int, default=0)

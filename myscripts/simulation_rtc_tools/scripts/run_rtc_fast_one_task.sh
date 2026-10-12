@@ -12,6 +12,7 @@ DRY_RUN=false
 MODEL_NAME=step2000
 PRECISION=bf16
 RESUME_RUN_DIR=""
+GPU_IDS=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --task) TASK="$2"; shift 2 ;;
@@ -20,6 +21,8 @@ while [[ $# -gt 0 ]]; do
     --model) MODEL_NAME="$2"; shift 2 ;;
     --precision) PRECISION="$2"; shift 2 ;;
     --resume-run-dir) RESUME_RUN_DIR="$2"; shift 2 ;;
+    --gpu|--gpu-id|--gpu_id) GPU_IDS="$2"; shift 2 ;;
+    --gpu-ids|--gpu_ids) GPU_IDS="$2"; shift 2 ;;
     --request-index) export LINGBOT_RTC_REQUEST_INDEX="$2"; shift 2 ;;
     --execution-horizon) export LINGBOT_RTC_EXECUTION_HORIZON="$2"; shift 2 ;;
     --fixed-delay-steps) export LINGBOT_RTC_FIXED_DELAY_STEPS="$2"; shift 2 ;;
@@ -31,6 +34,9 @@ while [[ $# -gt 0 ]]; do
       TASK="$1"; shift ;;
   esac
 done
+[[ -z "$GPU_IDS" || "$GPU_IDS" =~ ^[0-9]+(,[0-9]+)*$ ]] || {
+  echo "GPU ids must be comma-separated non-negative integers: $GPU_IDS" >&2; exit 2;
+}
 [[ -n "$TASK" ]] || { echo "usage: $0 TASK|--task TASK [options]" >&2; exit 2; }
 
 source "$ROOT/evaluation/model_registry.sh"
@@ -60,6 +66,10 @@ EXTRA=()
 if [[ -n "$RESUME_RUN_DIR" ]]; then
   EXTRA+=(--resume_run_dir "$RESUME_RUN_DIR")
 fi
+if [[ -n "$GPU_IDS" ]]; then
+  EXTRA+=(--gpu_ids "$GPU_IDS")
+  export LINGBOT_GPU_IDS="$GPU_IDS"
+fi
 
 COMMAND=(bash "$HERE/start_robotwin_rtc_infer_and_eval.sh"
   --model_path "$LINGBOT_MODEL_PATH"
@@ -83,6 +93,7 @@ if $DRY_RUN; then
     [[ -v "$var" ]] && printf '%s=%q ' "$var" "${!var}"
   done
   printf 'LINGBOT_RTC_EVAL_CLIENT=%q ' "$TOOL/copied_eval/eval_policy_client_lingbotvla_rtc.py"
+  [[ -n "$GPU_IDS" ]] && printf 'LINGBOT_GPU_IDS=%q ' "$GPU_IDS"
   printf 'LINGBOT_EVAL_MODE=%q LINGBOT_PROVENANCE_ENABLED=%q ' "$LINGBOT_EVAL_MODE" "$LINGBOT_PROVENANCE_ENABLED"
   printf '%q ' "${COMMAND[@]}"
   printf '\n'

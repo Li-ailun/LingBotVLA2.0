@@ -28,6 +28,7 @@ def test_init_run_writes_model_precision_mode_and_rtc_config(tmp_path: Path) -> 
         "--run-dir", str(tmp_path), "--task-config", "demo_clean",
         "--episodes", "50", "--action-chunk", "50",
         "--use-compile", "True", "--num-gpus", "1", "--num-servers", "1",
+        "--gpu-ids", "2,5,8",
     ], text=True, capture_output=True, env=env)
 
     assert result.returncode == 0, result.stderr
@@ -50,3 +51,4 @@ def test_init_run_writes_model_precision_mode_and_rtc_config(tmp_path: Path) -> 
     }
     assert manifest["evaluation"]["episodes_per_task"] == 50
     assert manifest["inference"]["action_chunk"] == 50
+    assert manifest["inference"]["physical_gpu_ids"] == [2, 5, 8]

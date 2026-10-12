@@ -63,6 +63,37 @@ def test_non_rtc_rejects_unknown_model():
     assert "Unknown model" in result.stderr
 
 
+def test_non_rtc_can_select_physical_gpu_without_changing_default_command():
+    selected = dry(
+        "run_eval.sh", "demo_clean", "--model", "full5k", "--gpu", "8"
+    )
+    default = dry("run_eval.sh", "demo_clean", "--model", "full5k")
+
+    assert "--gpu_ids 8" in selected
+    assert "LINGBOT_GPU_IDS=8" in selected
+    assert "--gpu_ids" not in default
+
+
+def test_non_rtc_rejects_non_numeric_gpu_id():
+    result = subprocess.run(
+        [
+            "bash", str(ROOT / "run_eval.sh"), "demo_clean",
+            "--gpu", "eight", "--dry-run",
+        ],
+        text=True, capture_output=True,
+    )
+    assert result.returncode != 0
+    assert "GPU" in result.stderr
+
+
+def test_non_rtc_accepts_arbitrary_non_contiguous_gpu_list():
+    output = dry(
+        "run_eval.sh", "demo_clean", "--model", "full5k",
+        "--gpu-ids", "1,4,7",
+    )
+    assert "--gpu_ids 1\\,4\\,7" in output
+
+
 def test_policy_server_resolves_auxiliary_assets_independently_of_weight_layout():
     text = (ROOT / "policy_server.py").read_text(encoding="utf-8")
     assert 'os.environ.get("LINGBOT_MODELS_ROOT"' in text
