@@ -84,7 +84,7 @@ fi
 COMMAND=(bash "$ROOT/myscripts/simulation_rtc_tools/scripts/start_robotwin_rtc_infer_and_eval.sh"
   --model_path "$MODEL"
   --inference_script evaluation/lingbot_action_step2000/policy_server.py
-  --inference_workdir "$ROOT/lingbot-vla-v2/"
+  --inference_workdir "$ROOT"
   --eval_workdir "$ROOT/RoboTwin_lingbot"
   --output_base "$OUTPUT"
   --conda_sh "$LINGBOT_CONDA_SH"

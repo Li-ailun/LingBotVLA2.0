@@ -35,6 +35,15 @@ def test_non_rtc_selects_full5k_without_copying_checkpoint():
     assert "LINGBOT_PROVENANCE_ENABLED=1" in output
 
 
+def test_non_rtc_runs_project_module_from_project_root():
+    output = dry(
+        "run_eval.sh", "demo_clean", "--model", "full5k", "--precision", "bf16"
+    )
+
+    assert f"--inference_workdir {ROOT.parent.parent}" in output
+    assert f"--inference_workdir {ROOT.parent.parent / 'lingbot-vla-v2'}" not in output
+
+
 def test_non_rtc_supports_fp32_and_resume_directory():
     resume = "/tmp/full5k-non-rtc-resume"
     output = dry(

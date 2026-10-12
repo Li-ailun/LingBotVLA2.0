@@ -40,7 +40,10 @@ bash myscripts/simulation_rtc_tools/scripts/run_rtc_fast_50x50.sh \
 
 
 查看成功率：
-for f in "$RUN"/eval_logs/*.log; do
+export RUN="/home/lixiang/PROJECT/LingBotVLA2.0/evaluation/lingbot_action_step2000/results/full5k/bf16/clean/lingbot_full_5k_6_60_5k_demo_clean_20261012_235815"
+
+find "$RUN/eval_logs" -maxdepth 1 -type f -name '*.log' -print0 |
+while IFS= read -r -d '' f; do
   result=$(
     sed -r 's/\x1B\[[0-9;]*[mK]//g' "$f" |
     tr '\r' '\n' |
