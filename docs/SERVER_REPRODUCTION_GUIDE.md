@@ -51,6 +51,8 @@ LingBotVLA2.0/
 ├── evaluation/
 │   ├── model_registry.sh
 │   ├── runtime_paths.sh
+│   ├── prepare_runtime.sh
+│   ├── runtime_assets/             # 小型配置与外部资产清单
 │   ├── eval_provenance/
 │   ├── MODEL_ADAPTERS.md
 │   └── lingbot_action_step2000/
@@ -82,7 +84,8 @@ evaluation/
 myscripts/simulation_rtc_tools/
 myscripts/video_tools/
 lingbot-vla-v2/ 的源码
-RoboTwin_lingbot/ 的源码、任务配置和小型说明资产
+RoboTwin_lingbot/ 的源码
+evaluation/runtime_assets/ 中可恢复的任务配置与下载清单
 ```
 
 Git不包含：
@@ -99,6 +102,51 @@ Conda环境、CUDA和驱动
 ```
 
 仓库没有 `.gitmodules`，clone后不需要执行 `git submodule update`。
+
+### 大型依赖下载边界
+
+以下内容不上传Git：模型权重、约16GB RoboTwin资产和约241MB CuRobo源码。
+固定来源记录在 `evaluation/runtime_assets/manifest.json`：
+
+```text
+RoboTwin 2.0资产：
+https://huggingface.co/datasets/TianxingChen/RoboTwin2.0
+
+CuRobo源码：
+https://github.com/NVlabs/curobo.git
+commit d64c4b005459db10c5dd867d8b30a87d5bda9bdb
+```
+
+官方资产页提供 `background_texture.zip`、`embodiments.zip`、`objects.zip`。
+解压后必须形成下面的直接层级，不能出现 `assets/assets/`：
+
+```text
+RoboTwin_lingbot/assets/background_texture/
+RoboTwin_lingbot/assets/embodiments/aloha-agilex/
+RoboTwin_lingbot/assets/objects/objaverse/list.json
+```
+
+准备脚本默认只复制几十KB任务配置并验证已有资产，不会自动下载大型文件：
+
+```bash
+bash evaluation/prepare_runtime.sh
+```
+
+若服务器已有共享资产，可用绝对路径建立三个细粒度软链接：
+
+```bash
+bash evaluation/prepare_runtime.sh \
+  --assets-source /absolute/path/to/shared/assets
+```
+
+缺少CuRobo时，脚本会打印固定仓库和commit。确认CUDA编译环境正常后，才显式执行：
+
+```bash
+bash evaluation/prepare_runtime.sh --install-curobo
+```
+
+也可自行按manifest固定commit安装；不要安装未固定版本的 `nvidia-curobo` 来冒充
+本项目已验证源码。
 
 ## 3. 模型注册系统
 
@@ -398,7 +446,7 @@ RoboTwin：SAPIEN仿真、评测客户端、RTC配置解析
 ```bash
 conda env list
 conda run -n lingbotvla python -c 'import torch; print(torch.__version__, torch.cuda.is_available())'
-conda run -n RoboTwin python -c 'import yaml, sapien; print("RoboTwin env OK")'
+conda run -n RoboTwin python -c 'import torch, sapien, mplib, curobo, pytorch3d; print("RoboTwin env OK", torch.__version__, torch.version.cuda)'
 ```
 
 ## 7. `runtime_paths.sh`机制
@@ -696,7 +744,11 @@ export LINGBOT_CONDA_SH=/usr/local/anaconda3/etc/profile.d/conda.sh
 export ROBOTWIN_PYTHON=/home/hddData/User/lixiang/conda-envs/RoboTwin/bin/python
 export LINGBOTVLA_PYTHON=/home/hddData/User/lixiang/conda-envs/lingbotvla/bin/python
 
-bash myscripts/simulation_rtc_tools/scripts/preflight.sh
+bash evaluation/prepare_runtime.sh
+bash myscripts/simulation_rtc_tools/scripts/preflight.sh --model full5k
+
+# GPU可见时可额外执行PyTorch3D CUDA算子检查；仍不会启动episode。
+bash myscripts/simulation_rtc_tools/scripts/preflight.sh --model full5k --deep
 
 bash myscripts/simulation_rtc_tools/scripts/run_rtc_fast_one_task.sh \
   --task click_alarmclock \

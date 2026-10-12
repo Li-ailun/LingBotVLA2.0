@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "robotwin": {
+    "official_repository": "https://github.com/robotwin-Platform/RoboTwin.git",
+    "pinned_commit": "13c3c47ff4312dd62484bcd51be034af55c062d1",
+    "assets": {
+      "download_page": "https://huggingface.co/datasets/TianxingChen/RoboTwin2.0",
+      "repo_id": "TianxingChen/RoboTwin2.0",
+      "archives": [
+        "background_texture.zip",
+        "embodiments.zip",
+        "objects.zip"
+      ],
+      "required_paths": [
+        "assets/background_texture",
+        "assets/embodiments/aloha-agilex",
+        "assets/objects/objaverse/list.json"
+      ]
+    },
+    "task_config_sha256": {
+      "_camera_config.yml": "a535e897288dbe130bd2f9ed7e5f22604eb33a9a2aab71b543fbd84d0cdd4521",
+      "_config_template.yml": "4fd45b0a1013fa09dddf8c954c2740f80786b027c1d42aae5bf47875209e7bbf",
+      "_embodiment_config.yml": "b0a198ff27bf6bf6b73162d2d1adafc7e73fcdf53f39943e67e40fee15bd83fa",
+      "_eval_step_limit.yml": "41c62bd26184977bae45aee555edd0cc21de5cddf560c2595921fc23a1e3b551",
+      "create_task_config.sh": "4a2ae1e44ea0b6b2cd1d02b4374582117c8f07c5692755dd14336863541f69e6",
+      "demo_clean.yml": "8ee5d0d07daecf7599b8d89b44776b700c7c60da24cd6317e176e6798d8cb11e",
+      "demo_randomized.yml": "a5a371f17188f602ff611154efce5299836a01a5e16d4b0f9b4bdbf6c714eb89"
+    }
+  },
+  "curobo": {
+    "repository": "https://github.com/NVlabs/curobo.git",
+    "pinned_commit": "d64c4b005459db10c5dd867d8b30a87d5bda9bdb",
+    "checkout": "RoboTwin_lingbot/envs/curobo",
+    "install": "ROBOTWIN_PYTHON -m pip install -e RoboTwin_lingbot/envs/curobo --no-build-isolation"
+  },
+  "conda_environments": {
+    "lingbotvla": "model inference service",
+    "RoboTwin": "simulator and evaluation client"
+  }
+}

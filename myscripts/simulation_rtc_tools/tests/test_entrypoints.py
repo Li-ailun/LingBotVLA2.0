@@ -194,3 +194,13 @@ def test_rtc_entrypoints_share_overridable_runtime_paths():
     for name in scripts:
         text = (TOOL / "scripts" / name).read_text(encoding="utf-8")
         assert "runtime_paths.sh" in text
+
+
+def test_preflight_validates_selected_model_and_runtime_assets():
+    output = run(
+        "bash", str(TOOL / "scripts/preflight.sh"),
+        "--model", "full5k",
+    )
+    assert "MODEL ADAPTER VALID: full5k" in output
+    assert "ASSET LAYOUT VALID" in output
+    assert "RUNTIME IMPORTS VALID" in output
