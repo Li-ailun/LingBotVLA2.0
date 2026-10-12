@@ -1,0 +1,1 @@
+/home/lixiang/PROJECT/LingBotVLA2.0/readme/各个权重成功率
