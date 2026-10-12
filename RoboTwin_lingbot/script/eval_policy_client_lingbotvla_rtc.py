@@ -20,7 +20,10 @@ if str(ROBOTWIN_ROOT) not in sys.path:
     sys.path.insert(0, str(ROBOTWIN_ROOT))
 
 import script.eval_policy_client_lingbotvla as upstream
+import script.deploy_rtc.websocket_client_policy as isolated_websocket_client
 from envs.utils.create_actor import UnStableError
+
+sys.modules["script.deploy.websocket_client_policy"] = isolated_websocket_client
 
 
 TOOL_ROOT = Path(os.environ["LINGBOT_RTC_TOOL_ROOT"]).resolve()
@@ -35,6 +38,7 @@ from simulation_rtc.config import RTCConfig, RobotActionLayout
 from simulation_rtc.eval_loop import run_rtc_episode
 from simulation_rtc.metrics import JSONLTraceWriter
 from myscripts.video_tools.fresh_frame_recording import install_fresh_frame_recording
+from evaluation.eval_provenance import EvaluationRecorder
 
 
 class RoboTwinWebsocketTransport:
@@ -73,6 +77,9 @@ def eval_policy(task_name, TASK_ENV, args, unused_model, st_seed, test_num=100,
     layout = RobotActionLayout.from_yaml(robot_config)
     trace_path = Path(usr_args["output_dir"]) / task_name / "rtc_trace.jsonl"
     trace = JSONLTraceWriter(trace_path)
+    recorder = EvaluationRecorder(
+        Path(usr_args["output_dir"]).resolve().parent, task=task_name
+    )
     worker = AsyncPolicyWorker(
         lambda: RoboTwinWebsocketTransport(int(usr_args["port"])),
         layout, config.request_timeout_s,
@@ -150,6 +157,20 @@ def eval_policy(task_name, TASK_ENV, args, unused_model, st_seed, test_num=100,
                 print("\033[92mSuccess!\033[0m")
             else:
                 print("\033[91mFail!\033[0m")
+            recorder.record_episode({
+                "episode_index": int(TASK_ENV.test_num),
+                "environment_seed": int(now_seed),
+                "success": bool(succ),
+                "instruction": str(instruction),
+                "policy_steps": int(rtc_result.action_count),
+                "inference_calls": int(rtc_result.request_count + 1),
+                "rtc_request_calls": int(rtc_result.request_count),
+                "rtc_pause_seconds": float(rtc_result.pause_seconds),
+                "mode": "rtc",
+                "inference_port": int(usr_args["port"]),
+                "rtc_trace_path": str(trace_path),
+                "video_path": new_name if os.path.exists(new_name) else None,
+            })
             now_id += 1
             TASK_ENV.close_env(clear_cache=((succ_seed + 1) % clear_cache_freq == 0))
             if TASK_ENV.render_freq:
