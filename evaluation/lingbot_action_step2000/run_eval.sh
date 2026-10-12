@@ -3,6 +3,8 @@ set -euo pipefail
 
 HERE="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(cd -- "$HERE/../.." && pwd)"
+source "$ROOT/evaluation/runtime_paths.sh"
+resolve_lingbot_runtime_paths
 SETTING="${1:?demo_clean or demo_randomized required}"
 shift
 
@@ -73,7 +75,7 @@ COMMAND=(bash "$ROOT/myscripts/simulation_rtc_tools/scripts/start_robotwin_rtc_i
   --inference_workdir "$ROOT/lingbot-vla-v2/"
   --eval_workdir "$ROOT/RoboTwin_lingbot"
   --output_base "$OUTPUT"
-  --conda_sh /home/lixiang/miniconda3/etc/profile.d/conda.sh
+  --conda_sh "$LINGBOT_CONDA_SH"
   --inference_env lingbotvla --sim_env RoboTwin
   --task_config "$SETTING" --num_tasks "$NUM_TASKS" --num_episodes "$EPISODES"
   --num_gpus 1 --num_per_gpu 1 --use_length 50

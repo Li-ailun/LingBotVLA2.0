@@ -3,6 +3,8 @@ set -euo pipefail
 
 HERE="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(cd -- "$HERE/../.." && pwd)"
+source "$ROOT/evaluation/runtime_paths.sh"
+resolve_lingbot_runtime_paths
 
 SETTING="${1:?usage: $0 demo_clean|demo_randomized [--task TASK] [--episodes N] [--video-fps N] [--dry-run]}"
 shift
@@ -59,7 +61,7 @@ COMMAND=(bash "$HERE/video_eval_launcher/start_robotwin_video_infer_and_eval.sh"
   --inference_workdir "$ROOT/lingbot-vla-v2/"
   --eval_workdir "$ROOT/RoboTwin_lingbot"
   --output_base "$ROOT/evaluation/video_comparison/$LINGBOT_MODEL_ID/$LINGBOT_PRECISION/non_rtc/${SETTING#demo_}/$TASK_DIR"
-  --conda_sh /home/lixiang/miniconda3/etc/profile.d/conda.sh
+  --conda_sh "$LINGBOT_CONDA_SH"
   --inference_env lingbotvla --sim_env RoboTwin
   --task_config "$SETTING" --num_tasks "$NUM_TASKS" --num_episodes "$EPISODES"
   --num_gpus 1 --num_per_gpu 1 --use_length 50

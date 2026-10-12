@@ -2,6 +2,19 @@
 
 这是 `lingbot_action_step2000` 的独立 RTC 仿真评测入口。它不会覆盖官方同步客户端，也不会改动 RoboTwin 环境、成功判定、`step_lim`、TOPP 或物理设置。
 
+运行时只依赖已有的 `RoboTwin` 和 `lingbotvla` Conda环境，不再依赖
+`point-flow-sim`。脚本默认通过当前Conda安装自动解析环境；服务器路径不同时
+可在启动前设置：
+
+```bash
+export LINGBOT_CONDA_SH=/path/to/conda/etc/profile.d/conda.sh
+export ROBOTWIN_PYTHON=/path/to/RoboTwin/bin/python
+export LINGBOTVLA_PYTHON=/path/to/lingbotvla/bin/python
+```
+
+如需单独指定RTC配置解析器，还可以设置 `LINGBOT_RTC_CONFIG_PY`；默认直接
+使用 `ROBOTWIN_PYTHON`。
+
 固定策略为：模型输出 50 步，第 10 步用新观测异步请求，第 20 步固定交接，RTC execution horizon 10，RLinf 风格 XFade4，EMA0.36。新结果先按 10 步交接延迟裁剪，再用 `old[20:24]` 与对齐后的 `new_raw[10:14]` 混合。结果未就绪时暂停仿真，因此等待不推进 SAPIEN、不调用 `take_action()`、不消耗动作预算。Crossfade 和 EMA 均排除夹爪维度。
 
 ## 预检

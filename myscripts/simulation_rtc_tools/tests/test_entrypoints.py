@@ -170,3 +170,27 @@ def test_full5k_rtc_video_path_identifies_model_precision_parameters_and_task():
         "evaluation/video_comparison/full5k/fp32/rtc/clean/"
         "request_10-delay_10-switch_20-horizon_10-xfade_4-ema_0p36/open_microwave"
     ) in output
+
+
+def test_rtc_entrypoints_do_not_depend_on_point_flow_sim():
+    scripts = [
+        "preflight.sh",
+        "run_rtc_fast_one_task.sh",
+        "run_rtc_fast_50x50.sh",
+        "run_rtc_video_eval.sh",
+    ]
+    for name in scripts:
+        text = (TOOL / "scripts" / name).read_text(encoding="utf-8")
+        assert "point-flow-sim" not in text
+
+
+def test_rtc_entrypoints_share_overridable_runtime_paths():
+    scripts = [
+        "preflight.sh",
+        "run_rtc_fast_one_task.sh",
+        "run_rtc_fast_50x50.sh",
+        "run_rtc_video_eval.sh",
+    ]
+    for name in scripts:
+        text = (TOOL / "scripts" / name).read_text(encoding="utf-8")
+        assert "runtime_paths.sh" in text

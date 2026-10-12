@@ -4,17 +4,19 @@ set -euo pipefail
 HERE="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 TOOL="$(cd -- "$HERE/.." && pwd)"
 ROOT="$(cd -- "$TOOL/../.." && pwd)"
-PYTEST_PY=/home/lixiang/miniconda3/envs/point-flow-sim/bin/python
+source "$ROOT/evaluation/runtime_paths.sh"
+resolve_lingbot_runtime_paths
+CONFIG_PY="${LINGBOT_RTC_CONFIG_PY:-$ROBOTWIN_PYTHON}"
 
 test -f "$ROOT/models/lingbot_action_step2000/model.safetensors.index.json"
 test -f "$ROOT/models/lingbot_action_step2000/configs/robot_configs/robotwin.yaml"
 test -f "$TOOL/copied_eval/eval_policy_client_lingbotvla_rtc.py"
 test -f "$ROOT/evaluation/lingbot_action_step2000/copied_eval/eval_policy_client_lingbotvla_recording.py"
 test -f "$TOOL/server/policy_server_rtc.py"
-test -x /home/lixiang/miniconda3/envs/lingbotvla/bin/python
-test -x /home/lixiang/miniconda3/envs/RoboTwin/bin/python
+test -x "$LINGBOTVLA_PYTHON"
+test -x "$ROBOTWIN_PYTHON"
 
-PYTHONPATH="$TOOL:$ROOT" "$PYTEST_PY" -c "from pathlib import Path; from simulation_rtc.config import RTCConfig, RobotActionLayout; c=RTCConfig.from_yaml(Path('$TOOL/configs/lingbot_action_step2000_rtc_fast.yaml')); l=RobotActionLayout.from_yaml(Path('$ROOT/models/lingbot_action_step2000/configs/robot_configs/robotwin.yaml')); assert (c.request_index,c.fixed_delay_steps,l.action_dim,l.gripper_indices)==(10,10,14,(6,13)); print('RTC CONFIG VALID')"
+PYTHONPATH="$TOOL:$ROOT" "$CONFIG_PY" -c "from pathlib import Path; from simulation_rtc.config import RTCConfig, RobotActionLayout; c=RTCConfig.from_yaml(Path('$TOOL/configs/lingbot_action_step2000_rtc_fast.yaml')); l=RobotActionLayout.from_yaml(Path('$ROOT/models/lingbot_action_step2000/configs/robot_configs/robotwin.yaml')); assert (c.request_index,c.fixed_delay_steps,l.action_dim,l.gripper_indices)==(10,10,14,(6,13)); print('RTC CONFIG VALID')"
 python3 -m py_compile "$TOOL"/simulation_rtc/*.py "$TOOL/server/policy_server_rtc.py" "$TOOL/copied_eval/eval_policy_client_lingbotvla_rtc.py" "$ROOT/evaluation/lingbot_action_step2000/copied_eval/eval_policy_client_lingbotvla_recording.py"
 
 printf '%s  %s\n' \

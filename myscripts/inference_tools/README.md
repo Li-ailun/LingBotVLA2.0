@@ -25,7 +25,7 @@ Run tests:
 ```bash
 cd /home/lixiang/PROJECT/LingBotVLA2.0
 PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 \
-  /home/lixiang/miniconda3/envs/point-flow-sim/bin/python -m pytest -q \
+  python3 -m pytest -q \
   myscripts/inference_tools/tests
 ```
 

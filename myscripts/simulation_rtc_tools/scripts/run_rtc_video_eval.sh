@@ -4,6 +4,8 @@ set -euo pipefail
 HERE="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 TOOL="$(cd -- "$HERE/.." && pwd)"
 ROOT="$(cd -- "$TOOL/../.." && pwd)"
+source "$ROOT/evaluation/runtime_paths.sh"
+resolve_lingbot_runtime_paths
 
 SETTING=demo_clean
 TASK=""
@@ -66,7 +68,7 @@ export LINGBOT_EVAL_CLIENT_SOURCE="$TOOL/copied_eval/eval_policy_client_lingbotv
 export LINGBOT_EVAL_CLIENT_NAME=eval_policy_client_lingbotvla_rtc.py
 export LINGBOT_RTC_CONFIG="$TOOL/configs/lingbot_action_step2000_rtc_fast.yaml"
 
-RTC_CONFIG_PY=/home/lixiang/miniconda3/envs/point-flow-sim/bin/python
+RTC_CONFIG_PY="${LINGBOT_RTC_CONFIG_PY:-$ROBOTWIN_PYTHON}"
 RTC_DETAILS=$(PYTHONPATH="$TOOL:$ROOT" "$RTC_CONFIG_PY" -c '
 import os
 from simulation_rtc.config import RTCConfig
@@ -87,7 +89,7 @@ COMMAND=(bash "$HERE/start_robotwin_rtc_infer_and_eval.sh"
   --inference_workdir "$ROOT/"
   --eval_workdir "$ROOT/RoboTwin_lingbot"
   --output_base "$ROOT/evaluation/video_comparison/$LINGBOT_MODEL_ID/$LINGBOT_PRECISION/rtc/${SETTING#demo_}/$RTC_CONFIG_TAG/$TASK_DIR"
-  --conda_sh /home/lixiang/miniconda3/etc/profile.d/conda.sh
+  --conda_sh "$LINGBOT_CONDA_SH"
   --inference_env lingbotvla --sim_env RoboTwin
   --task_config "$SETTING" --num_tasks "$NUM_TASKS" --num_episodes "$EPISODES"
   --num_gpus 1 --num_per_gpu 1 --use_length 50
