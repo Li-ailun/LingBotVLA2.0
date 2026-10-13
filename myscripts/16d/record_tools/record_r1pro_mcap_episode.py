@@ -172,23 +172,23 @@ PLATE_CUP_INSTRUCTIONS = {
     "stack_plates_cups_01": InstructionSpec(
         "stack_plates_and_cups",
         "stack_plates_cups_01",
-        "Stack the blue plate and then the pink plate on the left. "
-        "Stack the blue, red, and yellow cups on the right. "
-        "Finally, place the cup stack on the plates.",
+        "Arrange the blue plate at the bottom with the pink plate on top. "
+        "Arrange the cups from bottom to top as blue, red, and yellow, "
+        "with the cup stack on the plate stack.",
     ),
     "stack_plates_cups_02": InstructionSpec(
         "stack_plates_and_cups",
         "stack_plates_cups_02",
-        "Stack the blue plate and then the pink plate on the left. "
-        "Stack the red, yellow, and blue cups on the right. "
-        "Finally, place the cup stack on the plates.",
+        "Arrange the blue plate at the bottom with the pink plate on top. "
+        "Arrange the cups from bottom to top as red, yellow, and blue, "
+        "with the cup stack on the plate stack.",
     ),
     "stack_plates_cups_03": InstructionSpec(
         "stack_plates_and_cups",
         "stack_plates_cups_03",
-        "Stack the pink plate and then the blue plate on the left. "
-        "Stack the yellow, blue, and red cups on the right. "
-        "Finally, place the cup stack on the plates.",
+        "Arrange the pink plate at the bottom with the blue plate on top. "
+        "Arrange the cups from bottom to top as yellow, blue, and red, "
+        "with the cup stack on the plate stack.",
     ),
 }
 INSTRUCTION_ALIASES = {

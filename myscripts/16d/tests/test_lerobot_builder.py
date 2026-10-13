@@ -76,3 +76,20 @@ def test_builder_discovers_nested_instruction_episodes(tmp_path: Path) -> None:
         "stack_plates_cups_01/episode_000000",
         "stack_plates_cups_03/episode_000000",
     ]
+
+
+def test_builder_resizes_camera_image_to_declared_schema(tmp_path: Path) -> None:
+    image_path = tmp_path / "cam_high.jpg"
+    code = (
+        "import importlib.util,json;"
+        "from PIL import Image;"
+        f"Image.new('RGB',(1920,1080),(10,20,30)).save({str(image_path)!r});"
+        f"s=importlib.util.spec_from_file_location('builder',{str(SCRIPT)!r});"
+        "m=importlib.util.module_from_spec(s);s.loader.exec_module(m);"
+        f"a=m.read_rgb_image(m.Path({str(image_path)!r}),m.IMAGE_SHAPES['cam_high']);"
+        "print(json.dumps({'shape':list(a.shape),'dtype':str(a.dtype)}))"
+    )
+    result = subprocess.run([PYTHON, "-c", code], capture_output=True, text=True)
+    assert result.returncode == 0, result.stderr
+    image = json.loads(result.stdout)
+    assert image == {"shape": [360, 640, 3], "dtype": "uint8"}

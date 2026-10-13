@@ -497,9 +497,16 @@ def normalize_task_label(task: str) -> str:
     return text or "unknown_task"
 
 
-def read_rgb_image(path: Path) -> np.ndarray:
-    img = Image.open(path).convert("RGB")
-    return np.asarray(img, dtype=np.uint8)
+def read_rgb_image(path: Path, target_shape: tuple[int, int, int]) -> np.ndarray:
+    target_height, target_width, target_channels = target_shape
+    if target_channels != 3:
+        raise ValueError(f"RGB image target must have 3 channels, got {target_shape}")
+
+    with Image.open(path) as source:
+        img = source.convert("RGB")
+        if img.size != (target_width, target_height):
+            img = img.resize((target_width, target_height), Image.Resampling.LANCZOS)
+        return np.asarray(img, dtype=np.uint8)
 
 
 def find_image_path(cam_dir: Path, frame_idx: int) -> Path:
@@ -652,9 +659,15 @@ def convert_episode(dataset, ep_dir: Path):
     }
 
     for i in range(n):
-        cam_high = read_rgb_image(find_image_path(img_dirs["cam_high"], i))
-        cam_left = read_rgb_image(find_image_path(img_dirs["cam_left_wrist"], i))
-        cam_right = read_rgb_image(find_image_path(img_dirs["cam_right_wrist"], i))
+        cam_high = read_rgb_image(
+            find_image_path(img_dirs["cam_high"], i), IMAGE_SHAPES["cam_high"]
+        )
+        cam_left = read_rgb_image(
+            find_image_path(img_dirs["cam_left_wrist"], i), IMAGE_SHAPES["cam_left_wrist"]
+        )
+        cam_right = read_rgb_image(
+            find_image_path(img_dirs["cam_right_wrist"], i), IMAGE_SHAPES["cam_right_wrist"]
+        )
 
         frame = {
             "observation.images.cam_high": cam_high,

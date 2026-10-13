@@ -27,6 +27,7 @@ dist/
 
 # Downloaded models, checkpoints, and datasets
 /models/
+/datasets/
 /RoboTwin2_data/
 /baseline_base_model_adapter/checkpoints/
 **/checkpoints/

@@ -52,9 +52,42 @@ def test_plate_cup_instruction_catalog_and_directory_layout() -> None:
     assert payload["task_id"] == "stack_plates_and_cups"
     assert payload["parts"] == ["stack_plates_and_cups", "stack_plates_cups_02"]
     assert payload["text"] == (
-        "Stack the blue plate and then the pink plate on the left. "
-        "Stack the red, yellow, and blue cups on the right. "
-        "Finally, place the cup stack on the plates."
+        "Arrange the blue plate at the bottom with the pink plate on top. "
+        "Arrange the cups from bottom to top as red, yellow, and blue, "
+        "with the cup stack on the plate stack."
+    )
+
+
+def test_plate_cup_instructions_constrain_final_state_without_fixed_regions() -> None:
+    result = _run_python(
+        "import importlib.util,json;"
+        f"s=importlib.util.spec_from_file_location('recorder',{str(SCRIPT)!r});"
+        "m=importlib.util.module_from_spec(s);s.loader.exec_module(m);"
+        "print(json.dumps([m.resolve_instruction(str(i)).text for i in (1,2,3)]))"
+    )
+    assert result.returncode == 0, result.stderr
+    instructions = json.loads(result.stdout)
+    assert instructions == [
+        (
+            "Arrange the blue plate at the bottom with the pink plate on top. "
+            "Arrange the cups from bottom to top as blue, red, and yellow, "
+            "with the cup stack on the plate stack."
+        ),
+        (
+            "Arrange the blue plate at the bottom with the pink plate on top. "
+            "Arrange the cups from bottom to top as red, yellow, and blue, "
+            "with the cup stack on the plate stack."
+        ),
+        (
+            "Arrange the pink plate at the bottom with the blue plate on top. "
+            "Arrange the cups from bottom to top as yellow, blue, and red, "
+            "with the cup stack on the plate stack."
+        ),
+    ]
+    assert not any(
+        region in instruction.lower()
+        for instruction in instructions
+        for region in ("left", "right", "center", "middle")
     )
 
 
