@@ -16,6 +16,7 @@ MODEL_NAME=step2000
 PRECISION=bf16
 RESUME_RUN_DIR=""
 GPU_IDS=""
+START_SEED=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --task) TASK="$2"; shift 2 ;;
@@ -24,6 +25,7 @@ while [[ $# -gt 0 ]]; do
     --model) MODEL_NAME="$2"; shift 2 ;;
     --precision) PRECISION="$2"; shift 2 ;;
     --resume-run-dir) RESUME_RUN_DIR="$2"; shift 2 ;;
+    --start-seed) START_SEED="$2"; shift 2 ;;
     --gpu|--gpu-id|--gpu_id) GPU_IDS="$2"; shift 2 ;;
     --gpu-ids|--gpu_ids) GPU_IDS="$2"; shift 2 ;;
     --dry-run) DRY_RUN=true; shift ;;
@@ -33,6 +35,9 @@ done
 
 [[ -z "$GPU_IDS" || "$GPU_IDS" =~ ^[0-9]+(,[0-9]+)*$ ]] || {
   echo "GPU ids must be comma-separated non-negative integers: $GPU_IDS" >&2; exit 2;
+}
+[[ -z "$START_SEED" || "$START_SEED" =~ ^[0-9]+$ ]] || {
+  echo "start-seed must be a non-negative integer: $START_SEED" >&2; exit 2;
 }
 
 source "$ROOT/evaluation/model_registry.sh"
@@ -56,6 +61,9 @@ if [[ -n "$TASK" ]]; then
 fi
 if [[ -n "$RESUME_RUN_DIR" ]]; then
   EXTRA+=(--resume_run_dir "$RESUME_RUN_DIR")
+fi
+if [[ -n "$START_SEED" ]]; then
+  EXTRA+=(--start_seed "$START_SEED")
 fi
 if [[ -n "$GPU_IDS" ]]; then
   EXTRA+=(--gpu_ids "$GPU_IDS")

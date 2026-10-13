@@ -139,6 +139,16 @@ def test_full5k_video_path_identifies_model_precision_mode_and_task():
     assert "evaluation/video_comparison/full5k/fp32/non_rtc/clean/open_microwave" in output
 
 
+def test_non_rtc_video_can_replay_a_recorded_environment_seed():
+    output = dry(
+        "run_video_eval.sh", "demo_clean", "--task", "grab_roller",
+        "--episodes", "1", "--model", "full5k", "--precision", "bf16",
+        "--start-seed", "100014",
+    )
+    assert "--start_seed 100014" in output
+    assert "evaluation/video_comparison/full5k/bf16/non_rtc/clean/grab_roller" in output
+
+
 def test_video_launcher_deploys_an_isolated_fresh_frame_client():
     launcher = (ROOT / "video_eval_launcher/start_robotwin_video_infer_and_eval.sh").read_text()
     assert "eval_policy_client_lingbotvla_video.py" in launcher
