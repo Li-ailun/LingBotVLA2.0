@@ -266,11 +266,46 @@ export LINGBOTVLA_PYTHON=/path/to/lingbotvla/bin/python
 
 项目通过 `evaluation/runtime_paths.sh` 解析运行路径，不要求服务器复刻本机 `/home/lixiang/...` 根路径。
 
-遇到 `libcusparse` 或 `nvJitLink` 符号错误时，应检查PyTorch CUDA运行时是否与 `LD_LIBRARY_PATH` 指向的系统CUDA冲突，必要时先尝试：
+服务器上已经验证可用的环境设置形式如下。路径必须替换为服务器上的真实位置：
 
 ```bash
 unset LD_LIBRARY_PATH
+
+export CONDA_ENVS_PATH=/path/to/conda-envs
+export LINGBOT_CONDA_SH=/path/to/conda/etc/profile.d/conda.sh
+export ROBOTWIN_PYTHON=/path/to/conda-envs/RoboTwin/bin/python
+export LINGBOTVLA_PYTHON=/path/to/conda-envs/lingbotvla/bin/python
 ```
+
+建议在安装CuRobo、运行预检和启动评测之前执行这些设置。`unset LD_LIBRARY_PATH`只对当前Shell及其子进程生效，不会修改系统CUDA安装。
+
+`nvidia-smi`显示的CUDA版本是驱动支持的最高CUDA API版本，不等于当前PyTorch wheel使用的CUDA运行时。例如，驱动显示CUDA 13.0而PyTorch为`2.4.1+cu121`是允许的；关键是不要让系统CUDA 12.0动态库覆盖PyTorch/Conda需要的CUDA 12.1动态库。
+
+遇到 `libcusparse.so.12`、`libnvJitLink.so.12`或`__nvJitLinkAddData_12_1`符号错误时，先检查：
+
+```bash
+echo "${LD_LIBRARY_PATH-}"
+"$ROBOTWIN_PYTHON" -c \
+  'import torch; print(torch.__version__, torch.version.cuda, torch.cuda.is_available())'
+```
+
+若`LD_LIBRARY_PATH`包含与PyTorch不匹配的系统CUDA目录，先执行`unset LD_LIBRARY_PATH`，不要立即重装PyTorch、CUDA或整个Conda环境。
+
+CuRobo源码复制到新项目目录后，需要在RoboTwin环境中重新注册editable安装：
+
+```bash
+"$ROBOTWIN_PYTHON" -m pip install -e \
+  "$PWD/RoboTwin_lingbot/envs/curobo" \
+  --no-build-isolation
+```
+
+这会更新Conda环境中的包注册位置，不会修改模型权重或评测算法。首次运行时，启动器可能提示：
+
+```text
+Curobo yml paths stale -> regenerating for <SERVER_ROOT>/RoboTwin_lingbot
+```
+
+这是将CuRobo模板中的`${ASSETS_PATH}`展开为当前服务器路径，属于正常的部署路径适配。
 
 ## 6. 首次部署与预检
 
@@ -298,6 +333,8 @@ RUNTIME IMPORTS VALID
 RTC CONFIG VALID
 RTC PREFLIGHT OK
 ```
+
+预检成功只说明静态文件、依赖导入和RTC配置满足启动条件；它不会执行仿真episode。完成预检后仍需运行第15节的非RTC和RTC单任务冒烟测试。
 
 关键文件检查：
 
@@ -504,8 +541,9 @@ bash evaluation/prepare_runtime.sh
 ### `No module named curobo`
 
 ```bash
-conda activate RoboTwin
-python -m pip install -e "$PWD/RoboTwin_lingbot/envs/curobo" --no-build-isolation
+"$ROBOTWIN_PYTHON" -m pip install -e \
+  "$PWD/RoboTwin_lingbot/envs/curobo" \
+  --no-build-isolation
 ```
 
 ### 找不到`objaverse/list.json`
@@ -514,7 +552,23 @@ python -m pip install -e "$PWD/RoboTwin_lingbot/envs/curobo" --no-build-isolatio
 
 ### `libcusparse`或`nvJitLink`符号错误
 
-检查PyTorch CUDA与 `LD_LIBRARY_PATH`，必要时尝试 `unset LD_LIBRARY_PATH`。
+检查PyTorch CUDA与 `LD_LIBRARY_PATH`。如果系统CUDA目录覆盖了Conda/PyTorch运行库，执行`unset LD_LIBRARY_PATH`后重新验证导入。不要仅根据`nvidia-smi`顶部显示的CUDA版本重装环境。
+
+### preflight中的SHA256静态校验失败
+
+先确认工作区文件和当前Git提交中的文件是否一致。以`policy_server.py`为例：
+
+```bash
+sha256sum evaluation/lingbot_action_step2000/policy_server.py
+git show HEAD:evaluation/lingbot_action_step2000/policy_server.py | sha256sum
+git status --short -- evaluation/lingbot_action_step2000/policy_server.py
+```
+
+- 两个哈希不同：工作区文件被改动，先查明改动来源，不要盲目更新预检哈希。
+- 两个哈希一致，但预检仍报告旧哈希：当前Git版本的预检常量可能陈旧，应在主仓库修正`preflight.sh`并提交，然后由服务器`git pull`。
+- 不要为了迎合旧哈希直接执行`git checkout -- policy_server.py`，否则可能回退当前评测适配代码。
+
+当前仓库的静态校验值应随对应Git提交一起使用；不要在服务器上维护私有哈希补丁。
 
 ### `RuntimeError: cannot create buffer`
 
@@ -555,27 +609,48 @@ cd LingBotVLA2.0
 
 # 2. 按第3、4节放置约51.9GB大型资产
 
-# 3. 重新安装CuRobo editable源码
-conda activate RoboTwin
-python -m pip install -e "$PWD/RoboTwin_lingbot/envs/curobo" --no-build-isolation
-conda deactivate
+# 3. 解析服务器运行环境；以下路径按服务器实际位置修改
+unset LD_LIBRARY_PATH
+export CONDA_ENVS_PATH=/path/to/conda-envs
+export LINGBOT_CONDA_SH=/path/to/conda/etc/profile.d/conda.sh
+export ROBOTWIN_PYTHON=/path/to/conda-envs/RoboTwin/bin/python
+export LINGBOTVLA_PYTHON=/path/to/conda-envs/lingbotvla/bin/python
 
-# 4. 恢复任务配置并预检
+# 4. 重新注册CuRobo editable源码
+"$ROBOTWIN_PYTHON" -m pip install -e \
+  "$PWD/RoboTwin_lingbot/envs/curobo" \
+  --no-build-isolation
+
+# 5. 恢复任务配置并预检
 bash evaluation/prepare_runtime.sh
 bash myscripts/simulation_rtc_tools/scripts/preflight.sh --model full5k --deep
 
-# 5. 单任务非RTC冒烟测试
+# 6. 单任务非RTC冒烟测试
 bash evaluation/lingbot_action_step2000/run_eval.sh \
   demo_clean --model full5k --precision bf16 \
-  --task click_alarmclock --episodes 1
+  --task click_alarmclock --episodes 1 --gpu 0
 
-# 6. 单任务RTC冒烟测试
+# 7. 单任务RTC冒烟测试
 bash myscripts/simulation_rtc_tools/scripts/run_rtc_fast_one_task.sh \
   --task click_alarmclock --episodes 1 \
-  --model full5k --precision bf16 \
+  --model full5k --precision bf16 --gpu 0 \
   --request-index 20 --fixed-delay-steps 10 \
   --execution-horizon 20 --crossfade-steps 10 --ema-alpha 0.21
 ```
+
+将`--gpu 0`替换为实际要使用的物理GPU编号。单任务测试必须显式提供`--task click_alarmclock`；只指定`--episodes 1`并不会自动把任务数量限制为1。
+
+非RTC冒烟测试至少需要同时出现：
+
+```text
+[done] click_alarmclock ... (progress 1/1)
+Result: 1 done, 0 skipped
+All tasks fully executed 1 episodes
+All inference servers stopped
+Cleanup done
+```
+
+成功率可以是`1/1`或`0/1`：这里验证的是完整评测链路，而不是要求模型必须完成任务。RTC冒烟测试还应生成对应任务的`rtc_trace.jsonl`并包含`request`、`wait`或`promotion`等RTC事件。
 
 两个冒烟测试都完成episode并生成 `run_manifest.json`、`episodes.jsonl` 和任务日志后，再开始50×50全量评测。
 
