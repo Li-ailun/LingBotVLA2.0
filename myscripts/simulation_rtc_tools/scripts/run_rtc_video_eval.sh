@@ -15,6 +15,7 @@ DRY_RUN=false
 MODEL_NAME=step2000
 PRECISION=bf16
 RESUME_RUN_DIR=""
+START_SEED=""
 GPU_IDS=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -25,6 +26,7 @@ while [[ $# -gt 0 ]]; do
     --model) MODEL_NAME="$2"; shift 2 ;;
     --precision) PRECISION="$2"; shift 2 ;;
     --resume-run-dir) RESUME_RUN_DIR="$2"; shift 2 ;;
+    --start-seed) START_SEED="$2"; shift 2 ;;
     --gpu|--gpu-id|--gpu_id) GPU_IDS="$2"; shift 2 ;;
     --gpu-ids|--gpu_ids) GPU_IDS="$2"; shift 2 ;;
     --request-index) export LINGBOT_RTC_REQUEST_INDEX="$2"; shift 2 ;;
@@ -50,6 +52,9 @@ case "$SETTING" in
 esac
 [[ "$EPISODES" =~ ^[1-9][0-9]*$ ]] || { echo "episodes must be a positive integer" >&2; exit 2; }
 [[ "$VIDEO_FPS" =~ ^[1-9][0-9]*$ ]] || { echo "video-fps must be a positive integer" >&2; exit 2; }
+[[ -z "$START_SEED" || "$START_SEED" =~ ^[0-9]+$ ]] || {
+  echo "start-seed must be a non-negative integer: $START_SEED" >&2; exit 2;
+}
 
 NUM_TASKS=50
 EXTRA=()
@@ -61,6 +66,9 @@ if [[ -n "$TASK" ]]; then
 fi
 if [[ -n "$RESUME_RUN_DIR" ]]; then
   EXTRA+=(--resume_run_dir "$RESUME_RUN_DIR")
+fi
+if [[ -n "$START_SEED" ]]; then
+  EXTRA+=(--start_seed "$START_SEED")
 fi
 if [[ -n "$GPU_IDS" ]]; then
   EXTRA+=(--gpu_ids "$GPU_IDS")

@@ -54,3 +54,18 @@ full5k + BF16 + RTC
 Success: 798/2500
 Overall rate: 31.92%
 ###
+
+
+
+
+服务器上跑的部分进度：
+click_bell                       Success rate: 50/50 => 100.0%, current seed: 100049
+handover_block                   Success rate: 5/50 => 10.0%, current seed: 100057
+hanging_mug                      Success rate: 0/50 => 0.0%, current seed: 100058
+lift_pot                         Success rate: 10/50 => 20.0%, current seed: 100141
+open_microwave                   Success rate: 2/33 => 6.1%, current seed: 100040
+place_shoe                       Success rate: 7/12 => 58.3%, current seed: 100012
+put_object_cabinet               Success rate: 1/50 => 2.0%, current seed: 100354
+scan_object                      Success rate: 14/50 => 28.0%, current seed: 100170
+stack_blocks_three               Success rate: 0/13 => 0.0%, current seed: 100013
+stack_bowls_three                Success rate: 4/50 => 8.0%, current seed: 100082

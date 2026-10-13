@@ -13,6 +13,7 @@ lift_pot                         Success rate: 1/50 => 2.0%, current seed: 10013
 move_can_pot                     Success rate: 1/50 => 2.0%, current seed: 100053
 move_pillbottle_pad              Success rate: 0/50 => 0.0%, current seed: 100074
 move_playingcard_away            Success rate: 9/50 => 18.0%, current seed: 100049
+move_stapler_pad                 Success rate: 0/24 => 0.0%, current seed: 100025
 open_microwave                   Success rate: 25/50 => 50.0%, current seed: 100058
 place_cans_plasticbox            Success rate: 1/50 => 2.0%, current seed: 100051
 place_container_plate            Success rate: 12/50 => 24.0%, current seed: 100060
@@ -21,7 +22,9 @@ place_empty_cup                  Success rate: 12/50 => 24.0%, current seed: 100
 place_fan                        Success rate: 0/50 => 0.0%, current seed: 100059
 place_mouse_pad                  Success rate: 1/50 => 2.0%, current seed: 100049
 place_object_basket              Success rate: 1/50 => 2.0%, current seed: 100074
-place_object_scale               Success rate: 0/44 => 0.0%, current seed: 100062
+place_object_scale               Success rate: 0/50 => 0.0%, current seed: 100070
+place_object_stand               Success rate: 4/50 => 8.0%, current seed: 100052
+place_phone_stand                Success rate: 0/50 => 0.0%, current seed: 100073
 place_shoe                       Success rate: 5/50 => 10.0%, current seed: 100055
 put_object_cabinet               Success rate: 0/50 => 0.0%, current seed: 100292
 scan_object                      Success rate: 5/50 => 10.0%, current seed: 100170
@@ -31,4 +34,5 @@ stack_bowls_three                Success rate: 0/50 => 0.0%, current seed: 10009
 
 
 
-预计成功率百分之20左右
+
+预计成功率百分之15左右

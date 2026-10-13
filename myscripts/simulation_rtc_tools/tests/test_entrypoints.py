@@ -213,6 +213,20 @@ def test_rtc_video_path_records_effective_runtime_parameters():
     assert f"RTC result config directory: {tag}" in output
 
 
+def test_rtc_video_eval_can_replay_a_recorded_environment_seed():
+    output = run(
+        "bash", str(TOOL / "scripts/run_rtc_video_eval.sh"),
+        "--task", "adjust_bottle", "--episodes", "1",
+        "--model", "full5k", "--precision", "bf16",
+        "--start-seed", "100002", "--dry-run",
+    )
+    assert "--start_seed 100002" in output
+    assert (
+        "evaluation/video_comparison/full5k/bf16/rtc/clean/"
+        "request_10-delay_10-switch_20-horizon_10-xfade_4-ema_0p36/adjust_bottle"
+    ) in output
+
+
 def test_rtc_client_installs_fresh_frame_recording_hook():
     text = (TOOL / "copied_eval/eval_policy_client_lingbotvla_rtc.py").read_text(encoding="utf-8")
     assert "install_fresh_frame_recording(TASK_ENV)" in text
