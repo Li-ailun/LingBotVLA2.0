@@ -672,3 +672,80 @@ torch.compile设置
 ```
 
 同时保留 `run_manifest.json`、`episodes.jsonl`、推理日志和最终统计文件。
+
+
+
+总结：
+可以快速复现，但需要区分“代码快速复现”和“完整环境一键复现”。
+
+目前已经实现：
+
+```text
+Git拉取代码
++ 复制约51.9GB外部资产
++ 准备两个Conda环境
++ 注册CuRobo
++ 执行preflight
++ 单任务冒烟测试
+= 完整评测复现
+```
+
+已经在新服务器实际验证通过：
+
+- full5k权重加载
+- Qwen3-VL加载
+- RoboTwin、SAPIEN、CuRobo、PyTorch3D
+- BF16单GPU非RTC
+- BF16三GPU RTC并行
+- GPU编号映射
+- 日志、成功率与RTC trace
+
+但当前还不是“新机器执行一个命令就自动安装所有依赖”。复现者仍需：
+
+1. 建立兼容的`lingbotvla`和`RoboTwin`环境。
+2. 复制模型、RoboTwin assets和CuRobo源码。
+3. 避免系统`LD_LIBRARY_PATH`污染PyTorch CUDA运行库。
+4. 运行CuRobo editable安装。
+5. 执行preflight和冒烟测试。
+
+按照当前指南，在已经有两个兼容Conda环境的服务器上，代码和运行链路可以很快恢复；主要耗时来自约51.9GB资产传输，而不是代码适配。
+
+最短流程是：
+
+```bash
+git clone https://github.com/Li-ailun/LingBotVLA2.0.git
+cd LingBotVLA2.0
+
+# 将指南列出的模型及资产放入指定相对路径
+
+unset LD_LIBRARY_PATH
+export CONDA_ENVS_PATH=/path/to/conda-envs
+export LINGBOT_CONDA_SH=/path/to/conda/etc/profile.d/conda.sh
+export ROBOTWIN_PYTHON=/path/to/conda-envs/RoboTwin/bin/python
+export LINGBOTVLA_PYTHON=/path/to/conda-envs/lingbotvla/bin/python
+
+"$ROBOTWIN_PYTHON" -m pip install -e \
+  "$PWD/RoboTwin_lingbot/envs/curobo" \
+  --no-build-isolation
+
+bash evaluation/prepare_runtime.sh
+bash myscripts/simulation_rtc_tools/scripts/preflight.sh \
+  --model full5k \
+  --deep
+```
+
+然后单任务验证：
+
+```bash
+bash evaluation/lingbot_action_step2000/run_eval.sh \
+  demo_clean \
+  --model full5k \
+  --precision bf16 \
+  --task click_alarmclock \
+  --episodes 1 \
+  --gpu 0
+```
+
+因此准确结论是：
+
+> 如果Conda环境和大型资产已经准备好，当前仓库可以快速、无需修改代码地复现；如果面对完全空白的新服务器，仍需安装两个Conda环境和CUDA相关编译依赖，尚未达到完全一键部署。
