@@ -76,7 +76,7 @@ python3 -m py_compile "$TOOL"/simulation_rtc/*.py "$TOOL/server/policy_server_rt
 
 printf '%s  %s\n' \
   2fb48570fab1a0c5d7667215966bcd468cd24d7ad556a92303e68cc88f87ee8e "$ROOT/RoboTwin_lingbot/script/eval_policy_client_lingbotvla.py" \
-  ff74c9726e722416c9c7a57d88f7be855e848b4258f8828108e8c64f8e38b032 "$ROOT/evaluation/lingbot_action_step2000/policy_server.py" \
+  e1acfb9f710020211a59897fbdba6fcdd8eccea1f90abe93e6dcef60f7cc4f14 "$ROOT/evaluation/lingbot_action_step2000/policy_server.py" \
   2fb48570fab1a0c5d7667215966bcd468cd24d7ad556a92303e68cc88f87ee8e "$ROOT/lingbot-vla-v2/experiment/robotwin/eval_policy_client_lingbotvla.py" | sha256sum -c -
 
 bash "$HERE/run_rtc_fast_one_task.sh" lift_pot --dry-run >/dev/null
