@@ -99,3 +99,40 @@ def test_recorder_cli_accepts_instruction_id_without_generic_task() -> None:
     assert result.returncode == 0, result.stderr
     assert "--instruction-id" in result.stdout
     assert "--task" in result.stdout
+
+
+def test_recorder_operator_catalog_and_directory_layout() -> None:
+    result = _run_python(
+        "import importlib.util,json,types;"
+        f"s=importlib.util.spec_from_file_location('recorder',{str(SCRIPT)!r});"
+        "m=importlib.util.module_from_spec(s);s.loader.exec_module(m);"
+        "args=types.SimpleNamespace(instruction_id='stack_plates_cups_02',operator_id='liu');"
+        "print(json.dumps({'operators':m.OPERATOR_IDS,'resolved':m.resolve_operator(' LIU '),'path':str(m.task_directory(m.Path('/raw'),args))}))"
+    )
+    assert result.returncode == 0, result.stderr
+    payload = json.loads(result.stdout)
+    assert payload == {
+        "operators": ["li", "liu", "yu", "xing"],
+        "resolved": "liu",
+        "path": "/raw/stack_plates_and_cups/liu/stack_plates_cups_02",
+    }
+
+
+def test_recorder_rejects_unknown_operator() -> None:
+    result = _run_python(
+        "import importlib.util;"
+        f"s=importlib.util.spec_from_file_location('recorder',{str(SCRIPT)!r});"
+        "m=importlib.util.module_from_spec(s);s.loader.exec_module(m);"
+        "m.resolve_operator('other')"
+    )
+    assert result.returncode != 0
+    assert "choose one of: li, liu, yu, xing" in result.stderr
+
+
+def test_recorder_cli_exposes_operator_option() -> None:
+    result = subprocess.run(
+        ["/usr/bin/python3", str(SCRIPT), "--help"],
+        capture_output=True, text=True, check=False,
+    )
+    assert result.returncode == 0, result.stderr
+    assert "--operator" in result.stdout

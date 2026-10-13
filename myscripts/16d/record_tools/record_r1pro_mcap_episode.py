@@ -198,6 +198,18 @@ INSTRUCTION_ALIASES = {
     **{key: key for key in PLATE_CUP_INSTRUCTIONS},
 }
 
+OPERATOR_IDS = ["li", "liu", "yu", "xing"]
+OPERATOR_ORDER = {operator_id: index for index, operator_id in enumerate(OPERATOR_IDS)}
+
+
+def resolve_operator(value: str) -> str:
+    operator_id = str(value).strip().lower()
+    if operator_id not in OPERATOR_ORDER:
+        raise ValueError(
+            f"Unknown operator {value!r}; choose one of: {', '.join(OPERATOR_IDS)}"
+        )
+    return operator_id
+
 
 def resolve_instruction(value: str) -> InstructionSpec:
     key = INSTRUCTION_ALIASES.get(str(value).strip().lower())
@@ -222,10 +234,12 @@ def apply_instruction(args, value: str) -> InstructionSpec:
 
 
 def task_directory(root: Path, args) -> Path:
+    operator_id = resolve_operator(args.operator_id)
     if getattr(args, "instruction_id", None):
         spec = resolve_instruction(args.instruction_id)
-        return root.joinpath(*instruction_path_parts(spec))
-    return root / safe_task_dir_name(args.task)
+        task_id, instruction_id = instruction_path_parts(spec)
+        return root / task_id / operator_id / instruction_id
+    return root / safe_task_dir_name(args.task) / operator_id
 
 
 def now_stamp_ms() -> str:
@@ -876,6 +890,8 @@ def write_episode_config(
         "instruction_id": args.instruction_id,
         "instruction_text": args.instruction_text,
         "language": args.language,
+        "operator_id": args.operator_id,
+        "operator_order": OPERATOR_ORDER[args.operator_id],
         "schema": "r1pro_dual_arm_16d_left_first_v1",
         "safe_task_dir_name": safe_task_dir_name(args.task),
         "episode_index": episode_index,
@@ -1281,6 +1297,7 @@ def run_manual_loop(args):
     print("=" * 100)
     print("root:", root)
     print("task:", args.task)
+    print("operator_id:", args.operator_id)
     print("task_dir:", task_dir)
     print("storage_id:", args.storage_id)
     print("recording_profile: r1pro_dual_arm_16d_left_first_v1")
@@ -1387,6 +1404,11 @@ def main():
         "--instruction-id",
         help="Plate/cup instruction: 1, 2, 3, or stack_plates_cups_01..03.",
     )
+    parser.add_argument(
+        "--operator",
+        dest="operator_id",
+        help="Recording operator: li, liu, yu, or xing. Prompted when omitted.",
+    )
     parser.add_argument("--episode-index", type=str, default="auto")
 
     parser.add_argument("--storage-id", type=str, default="mcap")
@@ -1458,6 +1480,22 @@ def main():
     parser.add_argument("--warmup-timeout", type=float, default=10.0)
 
     args = parser.parse_args()
+    if args.operator_id:
+        try:
+            args.operator_id = resolve_operator(args.operator_id)
+        except ValueError as exc:
+            parser.error(str(exc))
+    else:
+        if not sys.stdin.isatty():
+            parser.error("provide --operator with one of: li, liu, yu, xing")
+        print("Select recording operator: li, liu, yu, or xing")
+        while True:
+            try:
+                args.operator_id = resolve_operator(input("operator> "))
+                break
+            except ValueError as exc:
+                print(color_text(f"[MANUAL] {exc}", COLOR_RED))
+
     if args.task and args.instruction_id:
         parser.error("--task and --instruction-id are mutually exclusive")
     if args.instruction_id:

@@ -24,11 +24,12 @@ source /opt/ros/humble/setup.bash
 
 ### 三类盘子/杯子任务
 
-脚本内置三条固定英文指令。直接运行且不传 `--task` 时，会提示选择 `1/2/3`；也可以在命令行指定：
+脚本启动时先选择本次录制人员，只接受 `li`、`liu`、`yu`、`xing`。人员在本次程序运行期间保持不变。随后选择三条固定英文指令之一。也可以在命令行同时指定人员和初始指令：
 
 ```bash
 /usr/bin/python3 myscripts/16d/record_tools/record_r1pro_mcap_episode.py \
   --root "$PWD/datasets/r1pro_mcap_raw" \
+  --operator li \
   --instruction-id 1
 ```
 
@@ -44,12 +45,16 @@ source /opt/ros/humble/setup.bash
 
 ```text
 datasets/r1pro_mcap_raw/stack_plates_and_cups/
-├── stack_plates_cups_01/episode_*/
-├── stack_plates_cups_02/episode_*/
-└── stack_plates_cups_03/episode_*/
+├── li/
+│   ├── stack_plates_cups_01/episode_*/
+│   ├── stack_plates_cups_02/episode_*/
+│   └── stack_plates_cups_03/episode_*/
+├── liu/
+├── yu/
+└── xing/
 ```
 
-每个episode的 `record_config.json` 同时记录 `task_id`、`instruction_id`、完整 `instruction_text` 和 `language`；`task.txt` 保存模型实际读取的完整英文指令。
+每个episode的 `record_config.json` 同时记录 `operator_id`、`operator_order`、`task_id`、`instruction_id`、完整 `instruction_text`、`language`和原MCAP episode序号；`task.txt` 保存模型实际读取的完整英文指令。
 
 固定录制11个话题：三路RGB图像、左右臂关节反馈、左右夹爪反馈、左右臂关节目标和左右夹爪目标。
 
@@ -80,8 +85,11 @@ source /opt/ros/humble/setup.bash
   --output "$PWD/datasets/r1pro_intermediate_16d/pick_up_object" \
   --fps 15 \
   --max-image-dt 0.12 \
-  --max-vec-dt 0.20
+  --max-vec-dt 0.20 \
+  --overwrite
 ```
+
+输出会镜像“人员/子任务/原MCAP episode”目录层级，并在`manifest.json`和每条`episode_meta.json`中保留人员、原MCAP序号以及源/中间目录对应关系。
 
 每个 episode 生成 `state.npy [N,16]`、`action.npy [N,16]`、`timestamps.npy`、三路图像、
 `episode_meta.json` 和逐帧拒绝记录。旧 bag 中即使包含腰部话题也不会被读取。
@@ -126,6 +134,23 @@ export HF_LEROBOT_HOME="$PWD/datasets/lerobot"
   --fps 15 \
   --overwrite
 ```
+
+四个人的数据会合并到同一个LeRobot数据集，固定顺序为：
+
+```text
+子任务01：li -> liu -> yu -> xing
+子任务02：li -> liu -> yu -> xing
+子任务03：li -> liu -> yu -> xing
+```
+
+每个人内部按原MCAP episode序号排列。LeRobot使用标准零基连续编号`episode_000000...`。数据集同时生成：
+
+```text
+meta/episode_source_map.jsonl
+meta/episode_source_map.csv
+```
+
+映射包含LeRobot零基episode编号、从1开始的人工查看序号、人员、子任务、原MCAP编号和路径、intermediate路径及帧数。发现坏数据时先查映射，删除对应原MCAP，然后用`--overwrite`依次重建intermediate和LeRobot；新LeRobot编号会自动压紧，映射也会重新生成。不能只删除MCAP后复用旧intermediate。
 
 ## 4. 数据审计与曲线
 

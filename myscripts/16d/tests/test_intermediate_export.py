@@ -78,6 +78,34 @@ print(json.dumps(m.read_episode_instruction_metadata(m.Path({str(episode)!r}))))
     assert payload["language"] == "en"
 
 
+def test_exporter_preserves_operator_and_source_episode_metadata(tmp_path: Path) -> None:
+    episode = tmp_path / "stack_plates_and_cups" / "yu" / "stack_plates_cups_03" / "episode_000012_20261013123456789"
+    episode.mkdir(parents=True)
+    (episode / "task.txt").write_text("instruction\n", encoding="utf-8")
+    (episode / "record_config.json").write_text(json.dumps({
+        "task_id": "stack_plates_and_cups",
+        "instruction_id": "stack_plates_cups_03",
+        "instruction_text": "instruction",
+        "language": "en",
+        "operator_id": "yu",
+        "operator_order": 2,
+        "episode_index": 12,
+    }), encoding="utf-8")
+    code = f"""
+import importlib.util,json
+s=importlib.util.spec_from_file_location('exporter',{str(SCRIPT)!r})
+m=importlib.util.module_from_spec(s);s.loader.exec_module(m)
+print(json.dumps(m.read_episode_instruction_metadata(m.Path({str(episode)!r}))))
+"""
+    result = subprocess.run(["/usr/bin/python3", "-c", code], capture_output=True, text=True)
+    assert result.returncode == 0, result.stderr
+    payload = json.loads(result.stdout)
+    assert payload["operator_id"] == "yu"
+    assert payload["operator_order"] == 2
+    assert payload["source_mcap_episode_index"] == 12
+    assert payload["source_mcap_episode_name"] == episode.name
+
+
 def test_exporter_discovers_nested_instruction_episodes(tmp_path: Path) -> None:
     for instruction_id in ("stack_plates_cups_01", "stack_plates_cups_02"):
         episode = tmp_path / "stack_plates_and_cups" / instruction_id / "episode_000000"

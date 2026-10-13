@@ -90,6 +90,7 @@ import argparse
 import bisect
 import importlib
 import json
+import re
 import shutil
 import sys
 from pathlib import Path
@@ -502,12 +503,26 @@ def read_episode_instruction_metadata(episode_dir: Path) -> dict:
         task = ""
     task = task or str(cfg.get("instruction_text") or cfg.get("task") or "").strip()
     task = task or "unknown_task"
+    episode_match = re.match(r"episode_(\d+)", episode_dir.name)
+    source_episode_index = cfg.get("episode_index")
+    if source_episode_index is None and episode_match:
+        source_episode_index = int(episode_match.group(1))
+    operator_id = str(cfg.get("operator_id") or "unknown").strip().lower() or "unknown"
+    operator_order = cfg.get("operator_order")
+    if operator_order is None:
+        operator_order = {"li": 0, "liu": 1, "yu": 2, "xing": 3}.get(operator_id, 999)
     return {
         "task": task,
         "task_id": str(cfg.get("task_id") or "").strip() or normalize_task_label(task),
         "instruction_id": str(cfg.get("instruction_id") or "").strip() or None,
         "instruction_text": str(cfg.get("instruction_text") or "").strip() or task,
         "language": str(cfg.get("language") or "").strip() or "unspecified",
+        "operator_id": operator_id,
+        "operator_order": int(operator_order),
+        "source_mcap_episode_index": (
+            int(source_episode_index) if source_episode_index is not None else None
+        ),
+        "source_mcap_episode_name": episode_dir.name,
     }
 
 
@@ -519,7 +534,12 @@ def write_image_payload(path: Path, payload):
     path.write_bytes(payload["bytes"])
 
 
-def convert_episode(episode_dir: Path, output_episode_dir: Path, args):
+def convert_episode(
+    episode_dir: Path,
+    output_episode_dir: Path,
+    args,
+    source_episode_relative_path: Path | None = None,
+):
     bag_dir = episode_dir / "bag"
     instruction_meta = read_episode_instruction_metadata(episode_dir)
     task = instruction_meta["task"]
@@ -684,6 +704,15 @@ def convert_episode(episode_dir: Path, output_episode_dir: Path, args):
         "instruction_id": instruction_meta["instruction_id"],
         "instruction_text": instruction_meta["instruction_text"],
         "language": instruction_meta["language"],
+        "operator_id": instruction_meta["operator_id"],
+        "operator_order": instruction_meta["operator_order"],
+        "source_mcap_episode_index": instruction_meta["source_mcap_episode_index"],
+        "source_mcap_episode_name": instruction_meta["source_mcap_episode_name"],
+        "source_episode_relative_path": (
+            str(source_episode_relative_path)
+            if source_episode_relative_path is not None
+            else episode_dir.name
+        ),
         "schema": SCHEMA_NAME,
         "frame_count": int(kept),
         "reference_camera": "cam_high",
@@ -755,11 +784,25 @@ def main():
         else:
             relative_episode = episode_dir.relative_to(input_path)
         output_episode_dir = output_root / relative_episode
-        convert_episode(episode_dir, output_episode_dir, args)
+        convert_episode(
+            episode_dir,
+            output_episode_dir,
+            args,
+            source_episode_relative_path=relative_episode,
+        )
+        episode_meta = read_episode_instruction_metadata(episode_dir)
         manifest["episodes"].append(
             {
                 "source": str(episode_dir),
+                "source_relative_path": str(relative_episode),
                 "intermediate": str(output_episode_dir),
+                "intermediate_relative_path": str(relative_episode),
+                "operator_id": episode_meta["operator_id"],
+                "operator_order": episode_meta["operator_order"],
+                "task_id": episode_meta["task_id"],
+                "instruction_id": episode_meta["instruction_id"],
+                "source_mcap_episode_index": episode_meta["source_mcap_episode_index"],
+                "source_mcap_episode_name": episode_meta["source_mcap_episode_name"],
             }
         )
 

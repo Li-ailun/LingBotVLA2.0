@@ -93,3 +93,99 @@ def test_builder_resizes_camera_image_to_declared_schema(tmp_path: Path) -> None
     assert result.returncode == 0, result.stderr
     image = json.loads(result.stdout)
     assert image == {"shape": [360, 640, 3], "dtype": "uint8"}
+
+
+def test_builder_orders_by_instruction_operator_and_source_episode(tmp_path: Path) -> None:
+    specs = [
+        ("stack_plates_cups_02", "li", 0),
+        ("stack_plates_cups_01", "yu", 0),
+        ("stack_plates_cups_01", "li", 3),
+        ("stack_plates_cups_01", "li", 1),
+        ("stack_plates_cups_01", "liu", 0),
+    ]
+    for instruction, operator, source_index in specs:
+        episode = tmp_path / operator / instruction / f"episode_{source_index:06d}_stamp"
+        (episode / "images").mkdir(parents=True)
+        (episode / "state.npy").write_bytes(b"placeholder")
+        (episode / "action.npy").write_bytes(b"placeholder")
+        (episode / "episode_meta.json").write_text(json.dumps({
+            "task_id": "stack_plates_and_cups",
+            "instruction_id": instruction,
+            "operator_id": operator,
+            "source_mcap_episode_index": source_index,
+            "source_mcap_episode_name": episode.name,
+        }), encoding="utf-8")
+    code = (
+        "import importlib.util,json;"
+        f"s=importlib.util.spec_from_file_location('builder',{str(SCRIPT)!r});"
+        "m=importlib.util.module_from_spec(s);s.loader.exec_module(m);"
+        f"r=m.Path({str(tmp_path)!r});"
+        "eps=m.order_episode_dirs(m.find_episode_dirs(r));"
+        "print(json.dumps([str(p.relative_to(r)) for p in eps]))"
+    )
+    result = subprocess.run([PYTHON, "-c", code], capture_output=True, text=True)
+    assert result.returncode == 0, result.stderr
+    assert json.loads(result.stdout) == [
+        "li/stack_plates_cups_01/episode_000001_stamp",
+        "li/stack_plates_cups_01/episode_000003_stamp",
+        "liu/stack_plates_cups_01/episode_000000_stamp",
+        "yu/stack_plates_cups_01/episode_000000_stamp",
+        "li/stack_plates_cups_02/episode_000000_stamp",
+    ]
+
+
+def test_builder_source_map_has_zero_and_one_based_numbers(tmp_path: Path) -> None:
+    episode = tmp_path / "liu" / "stack_plates_cups_01" / "episode_000007_stamp"
+    episode.mkdir(parents=True)
+    (episode / "episode_meta.json").write_text(json.dumps({
+        "task_id": "stack_plates_and_cups",
+        "instruction_id": "stack_plates_cups_01",
+        "instruction_text": "instruction one",
+        "operator_id": "liu",
+        "source_mcap_episode_index": 7,
+        "source_mcap_episode_name": "episode_000007_stamp",
+        "source_episode_dir": "/raw/stack_plates_and_cups/liu/stack_plates_cups_01/episode_000007_stamp",
+        "source_episode_relative_path": "liu/stack_plates_cups_01/episode_000007_stamp",
+        "frame_count": 123,
+    }), encoding="utf-8")
+    code = (
+        "import importlib.util,json;"
+        f"s=importlib.util.spec_from_file_location('builder',{str(SCRIPT)!r});"
+        "m=importlib.util.module_from_spec(s);s.loader.exec_module(m);"
+        f"ep=m.Path({str(episode)!r});root=m.Path({str(tmp_path)!r});"
+        "print(json.dumps(m.build_episode_source_record(ep,3,root)))"
+    )
+    result = subprocess.run([PYTHON, "-c", code], capture_output=True, text=True)
+    assert result.returncode == 0, result.stderr
+    payload = json.loads(result.stdout)
+    assert payload["lerobot_episode_index"] == 3
+    assert payload["lerobot_sequence_number"] == 4
+    assert payload["operator_id"] == "liu"
+    assert payload["source_mcap_episode_index"] == 7
+    assert payload["source_mcap_relative_path"].endswith(
+        "liu/stack_plates_cups_01/episode_000007_stamp"
+    )
+
+
+def test_builder_source_map_uses_actual_lerobot_chunk(tmp_path: Path) -> None:
+    dataset_root = tmp_path / "dataset"
+    parquet = dataset_root / "data" / "chunk-001" / "episode_001234.parquet"
+    parquet.parent.mkdir(parents=True)
+    parquet.write_bytes(b"parquet")
+    record = {
+        "lerobot_episode_index": 1234,
+        "lerobot_sequence_number": 1235,
+        "lerobot_episode_file": "episode_001234.parquet",
+    }
+    code = (
+        "import importlib.util,json;"
+        f"s=importlib.util.spec_from_file_location('builder',{str(SCRIPT)!r});"
+        "m=importlib.util.module_from_spec(s);s.loader.exec_module(m);"
+        f"root=m.Path({str(dataset_root)!r});records={json.dumps([record])!r};"
+        "m.write_episode_source_maps(root,json.loads(records));"
+        "print((root/'meta'/'episode_source_map.jsonl').read_text().strip())"
+    )
+    result = subprocess.run([PYTHON, "-c", code], capture_output=True, text=True)
+    assert result.returncode == 0, result.stderr
+    payload = json.loads(result.stdout)
+    assert payload["lerobot_episode_file"] == "data/chunk-001/episode_001234.parquet"

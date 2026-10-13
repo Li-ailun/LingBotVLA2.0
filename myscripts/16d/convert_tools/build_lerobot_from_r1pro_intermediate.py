@@ -446,6 +446,7 @@ Output:
 """
 
 import argparse
+import csv
 import importlib
 import inspect
 import json
@@ -475,6 +476,13 @@ IMAGE_SHAPES = {
     "cam_left_wrist": (480, 640, 3),
     "cam_right_wrist": (480, 640, 3),
 }
+
+INSTRUCTION_ORDER = {
+    "stack_plates_cups_01": 0,
+    "stack_plates_cups_02": 1,
+    "stack_plates_cups_03": 2,
+}
+OPERATOR_ORDER = {"li": 0, "liu": 1, "yu": 2, "xing": 3}
 
 def normalize_task_label(task: str) -> str:
     """Convert task text to a stable underscore label.
@@ -529,6 +537,114 @@ def find_episode_dirs(input_dir: Path):
     if not eps:
         raise RuntimeError(f"No intermediate episode directories found under: {input_dir}")
     return eps
+
+
+def read_episode_meta(ep_dir: Path) -> dict:
+    meta_file = ep_dir / "episode_meta.json"
+    if not meta_file.exists():
+        return {}
+    try:
+        return json.loads(meta_file.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+
+
+def _episode_index_from_name(name: str) -> int:
+    prefix = "episode_"
+    if not name.startswith(prefix):
+        return 10**12
+    digits = name[len(prefix):].split("_", 1)[0]
+    return int(digits) if digits.isdigit() else 10**12
+
+
+def episode_sort_key(ep_dir: Path):
+    meta = read_episode_meta(ep_dir)
+    task_id = str(meta.get("task_id") or "unknown_task")
+    instruction_id = str(meta.get("instruction_id") or "")
+    operator_id = str(meta.get("operator_id") or "unknown").lower()
+    source_index = meta.get("source_mcap_episode_index")
+    if source_index is None:
+        source_index = _episode_index_from_name(
+            str(meta.get("source_mcap_episode_name") or ep_dir.name)
+        )
+    return (
+        task_id,
+        INSTRUCTION_ORDER.get(instruction_id, 999),
+        instruction_id,
+        OPERATOR_ORDER.get(operator_id, 999),
+        operator_id,
+        int(source_index),
+        str(meta.get("source_mcap_episode_name") or ep_dir.name),
+        str(ep_dir),
+    )
+
+
+def order_episode_dirs(episode_dirs):
+    return sorted(episode_dirs, key=episode_sort_key)
+
+
+def build_episode_source_record(ep_dir: Path, lerobot_index: int, input_dir: Path) -> dict:
+    meta = read_episode_meta(ep_dir)
+    try:
+        intermediate_relative = str(ep_dir.relative_to(input_dir))
+    except ValueError:
+        intermediate_relative = ep_dir.name
+    source_relative = str(
+        meta.get("source_episode_relative_path")
+        or meta.get("source_mcap_relative_path")
+        or meta.get("source_mcap_episode_name")
+        or ep_dir.name
+    )
+    source_index = meta.get("source_mcap_episode_index")
+    if source_index is None:
+        source_index = _episode_index_from_name(
+            str(meta.get("source_mcap_episode_name") or ep_dir.name)
+        )
+        if source_index == 10**12:
+            source_index = None
+    return {
+        "lerobot_episode_index": int(lerobot_index),
+        "lerobot_sequence_number": int(lerobot_index) + 1,
+        "lerobot_episode_file": f"episode_{lerobot_index:06d}.parquet",
+        "operator_id": str(meta.get("operator_id") or "unknown"),
+        "task_id": str(meta.get("task_id") or "unknown_task"),
+        "instruction_id": meta.get("instruction_id"),
+        "instruction_text": str(meta.get("instruction_text") or meta.get("task") or ""),
+        "source_mcap_episode_index": source_index,
+        "source_mcap_episode_name": str(
+            meta.get("source_mcap_episode_name") or ep_dir.name
+        ),
+        "source_mcap_relative_path": source_relative,
+        "source_mcap_absolute_path": str(meta.get("source_episode_dir") or ""),
+        "intermediate_relative_path": intermediate_relative,
+        "intermediate_absolute_path": str(ep_dir),
+        "frame_count": int(meta.get("frame_count") or 0),
+    }
+
+
+def write_episode_source_maps(dataset_root: Path, records: list[dict]) -> None:
+    meta_dir = dataset_root / "meta"
+    meta_dir.mkdir(parents=True, exist_ok=True)
+    resolved_records = []
+    for record in records:
+        resolved = dict(record)
+        episode_index = int(resolved["lerobot_episode_index"])
+        matches = sorted(
+            dataset_root.glob(f"data/chunk-*/episode_{episode_index:06d}.parquet")
+        )
+        if len(matches) == 1:
+            resolved["lerobot_episode_file"] = str(matches[0].relative_to(dataset_root))
+        resolved_records.append(resolved)
+    jsonl_path = meta_dir / "episode_source_map.jsonl"
+    with jsonl_path.open("w", encoding="utf-8") as handle:
+        for record in resolved_records:
+            handle.write(json.dumps(record, ensure_ascii=False) + "\n")
+    csv_path = meta_dir / "episode_source_map.csv"
+    fieldnames = list(resolved_records[0]) if resolved_records else ["lerobot_episode_index"]
+    with csv_path.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(resolved_records)
 
 
 def make_features():
@@ -693,7 +809,7 @@ def main():
     args = parser.parse_args()
 
     input_dir = Path(args.input).expanduser().resolve()
-    episode_dirs = find_episode_dirs(input_dir)
+    episode_dirs = order_episode_dirs(find_episode_dirs(input_dir))
 
     print(f"[INFO] Found {len(episode_dirs)} intermediate episodes")
 
@@ -703,8 +819,17 @@ def main():
         overwrite=args.overwrite,
     )
 
-    for ep_dir in episode_dirs:
+    source_records = []
+    for lerobot_index, ep_dir in enumerate(episode_dirs):
         convert_episode(dataset, ep_dir)
+        source_record = build_episode_source_record(ep_dir, lerobot_index, input_dir)
+        source_records.append(source_record)
+        print(
+            f"[MAP] episode_{lerobot_index:06d} <- "
+            f"operator={source_record['operator_id']} "
+            f"instruction={source_record['instruction_id']} "
+            f"mcap={source_record['source_mcap_episode_name']}"
+        )
 
     schema_meta = HF_LEROBOT_HOME / args.repo_id / "meta" / "r1pro_schema.json"
     schema_meta.parent.mkdir(parents=True, exist_ok=True)
@@ -713,6 +838,7 @@ def main():
         "state_names": STATE_NAMES,
         "action_names": ACTION_NAMES,
     }, indent=2, ensure_ascii=False) + "\n")
+    write_episode_source_maps(HF_LEROBOT_HOME / args.repo_id, source_records)
 
     print("=" * 100)
     print("[DONE] intermediate -> LeRobot finished")
