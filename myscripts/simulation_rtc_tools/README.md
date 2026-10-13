@@ -65,7 +65,21 @@ bash myscripts/simulation_rtc_tools/scripts/run_rtc_fast_one_task.sh \
 bash myscripts/simulation_rtc_tools/scripts/run_rtc_fast_50x50.sh
 ```
 
-结果位于 `myscripts/simulation_rtc_tools/results/clean/`。每个任务的 `rtc_trace.jsonl` 记录 request、eligible step、wait、promotion、推理耗时、剩余旧动作和 episode 结果。RTC 结果属于推理策略实验，不能与同步 baseline 混写或冒充同步 baseline。
+默认评估 `demo_clean`，也可显式评估 randomized，并在已有评测占用
+9330 起始端口时选择另一组端口：
+
+```bash
+bash myscripts/simulation_rtc_tools/scripts/run_rtc_fast_50x50.sh \
+  --setting demo_randomized \
+  --base-port 9340
+```
+
+`--setting` 仅接受 `demo_clean` 或 `demo_randomized`；默认是
+`demo_clean`。`--base-port` 默认是 9330。结果按 setting 隔离在
+`myscripts/simulation_rtc_tools/results/<model>/<precision>/clean/` 或
+`randomized/`。每个任务的 `rtc_trace.jsonl` 记录 request、eligible step、
+wait、promotion、推理耗时、剩余旧动作和 episode 结果。RTC 结果属于推理
+策略实验，不能与同步 baseline 混写或冒充同步 baseline。
 
 ## 无界面快速仿真录像
 

@@ -449,6 +449,29 @@ bash myscripts/simulation_rtc_tools/scripts/run_rtc_fast_50x50.sh \
 
 需要时追加 `--gpu 8` 或 `--gpu-ids 2,5,8`。
 
+全量RTC入口默认使用 `demo_clean` 和起始端口9330。评估 randomized 时使用
+`--setting demo_randomized`；如果另一轮评测仍占用9330开始的端口，必须用
+`--base-port` 选择不冲突的端口。例如，在GPU 3、5上从9340开始运行：
+
+```bash
+bash myscripts/simulation_rtc_tools/scripts/run_rtc_fast_50x50.sh \
+  --setting demo_randomized \
+  --base-port 9340 \
+  --model full5k \
+  --precision bf16 \
+  --episodes 50 \
+  --gpu-ids 3,5 \
+  --request-index 20 \
+  --fixed-delay-steps 10 \
+  --execution-horizon 20 \
+  --crossfade-steps 10 \
+  --ema-alpha 0.21
+```
+
+该命令的结果进入
+`myscripts/simulation_rtc_tools/results/full5k/bf16/randomized/<run>/`。
+GPU显存是否足够仍应以启动前的 `nvidia-smi` 为准，不能仅根据利用率选择GPU。
+
 ## 10. 断点续评
 
 每个Run目录中的 `eval_results/<task>/episodes.jsonl` 记录成功和失败episode。下一个seed应取最后记录的 `environment_seed + 1`，不能简单按episode数量推算，因为无效场景seed可能被跳过。
@@ -489,7 +512,7 @@ bash myscripts/simulation_rtc_tools/scripts/run_rtc_fast_50x50.sh \
 
 ```text
 非RTC：evaluation/lingbot_action_step2000/results/<model>/<precision>/<setting>/<run>/
-RTC：myscripts/simulation_rtc_tools/results/<model>/<precision>/clean/<run>/
+RTC：myscripts/simulation_rtc_tools/results/<model>/<precision>/<setting>/<run>/
 ```
 
 Run目录通常包含：

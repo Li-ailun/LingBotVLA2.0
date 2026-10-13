@@ -16,6 +16,8 @@ INITIAL_EPISODE_COUNT=0
 INITIAL_SUCCESS_COUNT=0
 START_SEED=""
 GPU_IDS=""
+SETTING="demo_clean"
+BASE_PORT=9330
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --dry-run) DRY_RUN=true; shift ;;
@@ -29,6 +31,8 @@ while [[ $# -gt 0 ]]; do
     --start-seed) START_SEED="$2"; shift 2 ;;
     --gpu|--gpu-id|--gpu_id) GPU_IDS="$2"; shift 2 ;;
     --gpu-ids|--gpu_ids) GPU_IDS="$2"; shift 2 ;;
+    --setting) SETTING="$2"; shift 2 ;;
+    --base-port|--base_port|--start-port|--start_port) BASE_PORT="$2"; shift 2 ;;
     --request-index) export LINGBOT_RTC_REQUEST_INDEX="$2"; shift 2 ;;
     --execution-horizon) export LINGBOT_RTC_EXECUTION_HORIZON="$2"; shift 2 ;;
     --fixed-delay-steps) export LINGBOT_RTC_FIXED_DELAY_STEPS="$2"; shift 2 ;;
@@ -37,6 +41,16 @@ while [[ $# -gt 0 ]]; do
     *) echo "Unknown option: $1" >&2; exit 2 ;;
   esac
 done
+
+case "$SETTING" in
+  demo_clean|demo_randomized) ;;
+  *) echo "setting must be demo_clean or demo_randomized" >&2; exit 2 ;;
+esac
+
+if [[ ! "$BASE_PORT" =~ ^[0-9]+$ ]] || (( BASE_PORT < 1 || BASE_PORT > 65535 )); then
+  echo "base port must be an integer between 1 and 65535: $BASE_PORT" >&2
+  exit 2
+fi
 
 if [[ -n "$GPU_IDS" && ! "$GPU_IDS" =~ ^[0-9]+(,[0-9]+)*$ ]]; then
   echo "GPU ids must be comma-separated non-negative integers: $GPU_IDS" >&2
@@ -84,10 +98,11 @@ COMMAND=(bash "$HERE/start_robotwin_rtc_infer_and_eval.sh"
   --inference_script myscripts/simulation_rtc_tools/server/policy_server_rtc.py
   --inference_workdir "$ROOT/"
   --eval_workdir "$ROOT/RoboTwin_lingbot"
-  --output_base "$TOOL/results/$LINGBOT_MODEL_ID/$LINGBOT_PRECISION/clean"
+  --output_base "$TOOL/results/$LINGBOT_MODEL_ID/$LINGBOT_PRECISION/${SETTING#demo_}"
   --conda_sh "$LINGBOT_CONDA_SH"
   --inference_env lingbotvla --sim_env RoboTwin
-  --task_config demo_clean --num_tasks 50 --num_episodes "$EPISODES"
+  --task_config "$SETTING" --start_port "$BASE_PORT"
+  --num_tasks 50 --num_episodes "$EPISODES"
   --num_gpus 1 --num_per_gpu 1 --use_length 50
   --use_bf16 "$LINGBOT_USE_BF16" --use_fp32 "$LINGBOT_USE_FP32" --use_compile True --no_video
   "${EXTRA[@]}")

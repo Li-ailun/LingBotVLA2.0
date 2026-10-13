@@ -26,6 +26,28 @@ def test_batch_dry_run_defaults_to_clean_50_by_50():
     assert "demo_clean" in output
 
 
+def test_rtc_batch_supports_randomized_setting_and_separate_base_port():
+    output = run(
+        "bash", str(TOOL / "scripts/run_rtc_fast_50x50.sh"),
+        "--setting", "demo_randomized", "--base-port", "9340", "--dry-run",
+    )
+    assert "--task_config demo_randomized" in output
+    assert "results/step2000/bf16/randomized" in output
+    assert "--start_port 9340" in output
+
+
+def test_rtc_batch_rejects_unknown_setting():
+    result = subprocess.run(
+        [
+            "bash", str(TOOL / "scripts/run_rtc_fast_50x50.sh"),
+            "--setting", "random", "--dry-run",
+        ],
+        cwd=ROOT, text=True, capture_output=True,
+    )
+    assert result.returncode == 2
+    assert "setting must be demo_clean or demo_randomized" in result.stderr
+
+
 def test_rtc_batch_selects_full5k_and_separates_results():
     output = run(
         "bash", str(TOOL / "scripts/run_rtc_fast_50x50.sh"),
