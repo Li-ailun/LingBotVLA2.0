@@ -44,6 +44,7 @@ dist/
 
 # Evaluation, training, and visualization outputs
 /result/
+/reports/
 /**/results/
 /**/eval_result/
 /**/eval_results/
