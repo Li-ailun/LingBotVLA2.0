@@ -189,3 +189,27 @@ def test_builder_source_map_uses_actual_lerobot_chunk(tmp_path: Path) -> None:
     assert result.returncode == 0, result.stderr
     payload = json.loads(result.stdout)
     assert payload["lerobot_episode_file"] == "data/chunk-001/episode_001234.parquet"
+
+
+def test_builder_plans_bounded_worker_ranges() -> None:
+    code = (
+        "import importlib.util,json;"
+        f"s=importlib.util.spec_from_file_location('builder',{str(SCRIPT)!r});"
+        "m=importlib.util.module_from_spec(s);s.loader.exec_module(m);"
+        "print(json.dumps(m.plan_worker_ranges(25,7,10)))"
+    )
+    result = subprocess.run([PYTHON, "-c", code], capture_output=True, text=True)
+    assert result.returncode == 0, result.stderr
+    assert json.loads(result.stdout) == [[7, 17], [17, 25]]
+
+
+def test_builder_rejects_non_positive_worker_batch_size() -> None:
+    code = (
+        "import importlib.util;"
+        f"s=importlib.util.spec_from_file_location('builder',{str(SCRIPT)!r});"
+        "m=importlib.util.module_from_spec(s);s.loader.exec_module(m);"
+        "m.plan_worker_ranges(10,0,0)"
+    )
+    result = subprocess.run([PYTHON, "-c", code], capture_output=True, text=True)
+    assert result.returncode != 0
+    assert "episodes_per_worker must be positive" in result.stderr

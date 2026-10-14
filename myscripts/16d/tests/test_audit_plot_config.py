@@ -3,6 +3,8 @@ from __future__ import annotations
 import importlib.util
 from pathlib import Path
 
+import numpy as np
+
 
 ROOT = Path(__file__).parents[1] / "lerobot_tools"
 
@@ -21,6 +23,20 @@ def test_numeric_plot_defaults_cover_left_first_16d() -> None:
     assert module.DEFAULT_DIMS == 16
     assert module.DEFAULT_ARM_DIMS == list(range(7)) + list(range(8, 15))
     assert module.DEFAULT_GRIPPER_DIMS == [7, 15]
+
+
+def test_interactive_downsampling_is_bounded_and_keeps_endpoints() -> None:
+    module = _load("check_lerobot_v21_numeric_and_plot")
+    indices = module.downsample_indices(10001, 2000)
+    assert len(indices) <= 2000
+    assert indices[0] == 0
+    assert indices[-1] == 10000
+    assert np.all(np.diff(indices) > 0)
+
+
+def test_interactive_downsampling_zero_keeps_all_points() -> None:
+    module = _load("check_lerobot_v21_numeric_and_plot")
+    assert module.downsample_indices(7, 0).tolist() == list(range(7))
 
 
 def test_missing_audit_checks_no_torso_component() -> None:

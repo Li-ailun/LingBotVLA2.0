@@ -132,8 +132,11 @@ export HF_LEROBOT_HOME="$PWD/datasets/lerobot"
   --input "$PWD/datasets/r1pro_intermediate_16d/stack_plates_and_cups" \
   --repo-id lixiang/stack_plates_and_cups_16d \
   --fps 15 \
-  --overwrite
+  --overwrite \
+  --episodes-per-worker 10
 ```
+
+大数据集转换会按默认每10条episode重启子进程以释放图像和Arrow内存。中断后可在输入集合及排序不变的前提下使用`--resume`继续；不要同时使用`--overwrite`和`--resume`。
 
 四个人的数据会合并到同一个LeRobot数据集，固定顺序为：
 

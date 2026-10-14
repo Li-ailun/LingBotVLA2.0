@@ -447,10 +447,12 @@ Output:
 
 import argparse
 import csv
+import gc
 import importlib
 import inspect
 import json
 import shutil
+import subprocess
 import sys
 from pathlib import Path
 
@@ -483,6 +485,18 @@ INSTRUCTION_ORDER = {
     "stack_plates_cups_03": 2,
 }
 OPERATOR_ORDER = {"li": 0, "liu": 1, "yu": 2, "xing": 3}
+
+
+def plan_worker_ranges(total_episodes: int, start_index: int, episodes_per_worker: int) -> list[tuple[int, int]]:
+    """Split a conversion into bounded child-process ranges."""
+    if episodes_per_worker <= 0:
+        raise ValueError("episodes_per_worker must be positive")
+    if start_index < 0 or start_index > total_episodes:
+        raise ValueError("start_index must be between zero and total_episodes")
+    return [
+        (start, min(start + episodes_per_worker, total_episodes))
+        for start in range(start_index, total_episodes, episodes_per_worker)
+    ]
 
 def normalize_task_label(task: str) -> str:
     """Convert task text to a stable underscore label.
@@ -698,9 +712,9 @@ def create_dataset(repo_id: str, fps: int, overwrite: bool):
 
     # Make this script compatible with slightly different LeRobot versions.
     if "image_writer_threads" in create_sig.parameters:
-        kwargs["image_writer_threads"] = 10
+        kwargs["image_writer_threads"] = 2
     if "image_writer_processes" in create_sig.parameters:
-        kwargs["image_writer_processes"] = 5
+        kwargs["image_writer_processes"] = 1
     if "use_videos" in create_sig.parameters:
         kwargs["use_videos"] = True
 
@@ -797,7 +811,55 @@ def convert_episode(dataset, ep_dir: Path):
         add_frame_compatible(dataset, frame, task)
 
     save_episode_compatible(dataset, task)
+    del state, action, timestamps
+    gc.collect()
     print("[OK] saved LeRobot episode")
+
+
+def existing_episode_count(dataset_root: Path) -> int:
+    info_path = dataset_root / "meta" / "info.json"
+    if not info_path.is_file():
+        return 0
+    info = json.loads(info_path.read_text(encoding="utf-8"))
+    return int(info.get("total_episodes", 0))
+
+
+def write_schema_and_source_maps(dataset_root: Path, episode_dirs: list[Path], input_dir: Path) -> None:
+    schema_meta = dataset_root / "meta" / "r1pro_schema.json"
+    schema_meta.parent.mkdir(parents=True, exist_ok=True)
+    schema_meta.write_text(json.dumps({
+        "schema": SCHEMA_NAME,
+        "state_names": STATE_NAMES,
+        "action_names": ACTION_NAMES,
+    }, indent=2, ensure_ascii=False) + "\n")
+    source_records = [
+        build_episode_source_record(ep_dir, lerobot_index, input_dir)
+        for lerobot_index, ep_dir in enumerate(episode_dirs)
+    ]
+    write_episode_source_maps(dataset_root, source_records)
+
+
+def run_worker(args, input_dir: Path, episode_dirs: list[Path]) -> None:
+    dataset_root = HF_LEROBOT_HOME / args.repo_id
+    if args.worker_start == 0:
+        dataset = create_dataset(args.repo_id, args.fps, args.overwrite)
+    else:
+        dataset = LeRobotDataset(args.repo_id, root=dataset_root)
+        if dataset.num_episodes != args.worker_start:
+            raise RuntimeError(
+                f"append position mismatch: dataset has {dataset.num_episodes} episodes, "
+                f"worker starts at {args.worker_start}"
+            )
+    for lerobot_index in range(args.worker_start, args.worker_end):
+        ep_dir = episode_dirs[lerobot_index]
+        convert_episode(dataset, ep_dir)
+        source_record = build_episode_source_record(ep_dir, lerobot_index, input_dir)
+        print(
+            f"[MAP] episode_{lerobot_index:06d} <- "
+            f"operator={source_record['operator_id']} "
+            f"instruction={source_record['instruction_id']} "
+            f"mcap={source_record['source_mcap_episode_name']}"
+        )
 
 
 def main():
@@ -806,6 +868,11 @@ def main():
     parser.add_argument("--repo-id", default="lixiang/r1pro_16d_left_first")
     parser.add_argument("--fps", type=int, default=15)
     parser.add_argument("--overwrite", action="store_true")
+    parser.add_argument("--resume", action="store_true", help="Resume from the completed episode count")
+    parser.add_argument("--episodes-per-worker", type=int, default=10,
+                        help="Restart the converter after this many episodes to bound memory")
+    parser.add_argument("--worker-start", type=int, default=None, help=argparse.SUPPRESS)
+    parser.add_argument("--worker-end", type=int, default=None, help=argparse.SUPPRESS)
     args = parser.parse_args()
 
     input_dir = Path(args.input).expanduser().resolve()
@@ -813,32 +880,40 @@ def main():
 
     print(f"[INFO] Found {len(episode_dirs)} intermediate episodes")
 
-    dataset = create_dataset(
-        repo_id=args.repo_id,
-        fps=args.fps,
-        overwrite=args.overwrite,
-    )
+    if (args.worker_start is None) != (args.worker_end is None):
+        parser.error("--worker-start and --worker-end must be used together")
+    if args.worker_start is not None:
+        run_worker(args, input_dir, episode_dirs)
+        return
 
-    source_records = []
-    for lerobot_index, ep_dir in enumerate(episode_dirs):
-        convert_episode(dataset, ep_dir)
-        source_record = build_episode_source_record(ep_dir, lerobot_index, input_dir)
-        source_records.append(source_record)
-        print(
-            f"[MAP] episode_{lerobot_index:06d} <- "
-            f"operator={source_record['operator_id']} "
-            f"instruction={source_record['instruction_id']} "
-            f"mcap={source_record['source_mcap_episode_name']}"
+    dataset_root = HF_LEROBOT_HOME / args.repo_id
+    if args.overwrite and args.resume:
+        parser.error("--overwrite and --resume are mutually exclusive")
+    if dataset_root.exists() and not (args.overwrite or args.resume):
+        raise RuntimeError(f"Output dataset already exists: {dataset_root}. Use --overwrite or --resume.")
+    start_index = existing_episode_count(dataset_root) if args.resume else 0
+    if start_index > len(episode_dirs):
+        raise RuntimeError(
+            f"Existing dataset has {start_index} episodes but only {len(episode_dirs)} sources remain"
         )
+    ranges = plan_worker_ranges(len(episode_dirs), start_index, args.episodes_per_worker)
+    print(f"[INFO] Starting at episode {start_index}; worker batches: {ranges}")
+    for batch_number, (worker_start, worker_end) in enumerate(ranges, start=1):
+        command = [
+            sys.executable, str(Path(__file__).resolve()),
+            "--input", str(input_dir), "--repo-id", args.repo_id,
+            "--fps", str(args.fps),
+            "--worker-start", str(worker_start), "--worker-end", str(worker_end),
+        ]
+        if worker_start == 0 and args.overwrite:
+            command.append("--overwrite")
+        print(f"[WORKER {batch_number}/{len(ranges)}] episodes {worker_start}..{worker_end - 1}")
+        subprocess.run(command, check=True)
+        write_schema_and_source_maps(dataset_root, episode_dirs[:worker_end], input_dir)
+        print(f"[CHECKPOINT] completed {worker_end}/{len(episode_dirs)} episodes")
 
-    schema_meta = HF_LEROBOT_HOME / args.repo_id / "meta" / "r1pro_schema.json"
-    schema_meta.parent.mkdir(parents=True, exist_ok=True)
-    schema_meta.write_text(json.dumps({
-        "schema": SCHEMA_NAME,
-        "state_names": STATE_NAMES,
-        "action_names": ACTION_NAMES,
-    }, indent=2, ensure_ascii=False) + "\n")
-    write_episode_source_maps(HF_LEROBOT_HOME / args.repo_id, source_records)
+    if not ranges:
+        write_schema_and_source_maps(dataset_root, episode_dirs[:start_index], input_dir)
 
     print("=" * 100)
     print("[DONE] intermediate -> LeRobot finished")

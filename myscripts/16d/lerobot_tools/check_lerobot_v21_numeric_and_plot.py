@@ -47,6 +47,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import gc
 import json
 import subprocess
 from pathlib import Path
@@ -85,6 +86,10 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--interactive-groups", action="store_true", help="Write plots/interactive_episode_groups.html")
     p.add_argument("--interactive-group-sizes", default="1,5,10,20")
     p.add_argument("--interactive-default-group-size", type=int, default=1)
+    p.add_argument(
+        "--interactive-max-points", type=int, default=2000,
+        help="Maximum points retained per episode in interactive HTML; 0 keeps all points.",
+    )
     p.add_argument("--open-html", action="store_true", help="Run xdg-open for generated HTML pages")
     p.add_argument(
         "--interactive-only",
@@ -315,11 +320,25 @@ def _round_float_list(arr: np.ndarray, ndigits: int = 6) -> list[float]:
     return np.round(np.asarray(arr, dtype=np.float64), ndigits).tolist()
 
 
-def build_interactive_episode_payload(ep_idx: int, df: pd.DataFrame, fps: float, expected_dim: int) -> dict:
+def downsample_indices(length: int, max_points: int) -> np.ndarray:
+    if length <= 0:
+        return np.asarray([], dtype=np.int64)
+    if max_points <= 0 or length <= max_points:
+        return np.arange(length, dtype=np.int64)
+    if max_points == 1:
+        return np.asarray([0], dtype=np.int64)
+    return np.unique(np.linspace(0, length - 1, max_points, dtype=np.int64))
+
+
+def build_interactive_episode_payload(ep_idx: int, df: pd.DataFrame, fps: float, expected_dim: int, max_points: int) -> dict:
     df = sort_episode_df(df)
     state = to_array(df["observation.state"], expected_dim=expected_dim)
     action = to_array(df["action"], expected_dim=expected_dim)
     x, x_label = get_x_axis(df, fps)
+    keep = downsample_indices(len(x), max_points)
+    x = x[keep]
+    state = state[keep]
+    action = action[keep]
     return {
         "episode_index": int(ep_idx),
         "x": _round_float_list(x),
@@ -329,16 +348,13 @@ def build_interactive_episode_payload(ep_idx: int, df: pd.DataFrame, fps: float,
     }
 
 
-def write_interactive_group_html(out_dir: Path, episode_dfs: dict[int, pd.DataFrame], info: dict, fps: float, expected_dim: int, group_sizes: list[int], default_group_size: int) -> Path:
+def write_interactive_group_html(out_dir: Path, payload_path: Path, info: dict, expected_dim: int, group_sizes: list[int], default_group_size: int) -> Path:
     html = out_dir / "plots" / "interactive_episode_groups.html"
     html.parent.mkdir(parents=True, exist_ok=True)
-    eps = sorted(episode_dfs.keys())
-    payload = [build_interactive_episode_payload(ep_idx, episode_dfs[ep_idx], fps, expected_dim) for ep_idx in eps]
     state_names = [get_feature_names(info, "observation.state", i) for i in range(expected_dim)]
     action_names = [get_feature_names(info, "action", i) for i in range(expected_dim)]
     if default_group_size not in group_sizes:
         default_group_size = group_sizes[0]
-    data_json = json.dumps(payload, ensure_ascii=False)
     state_names_json = json.dumps(state_names, ensure_ascii=False)
     action_names_json = json.dumps(action_names, ensure_ascii=False)
     group_sizes_json = json.dumps(group_sizes)
@@ -347,8 +363,27 @@ def write_interactive_group_html(out_dir: Path, episode_dfs: dict[int, pd.DataFr
              "<style>body{font-family:Arial,sans-serif;margin:18px;background:#fafafa;color:#111}.toolbar{position:sticky;top:0;background:#fff;border:1px solid #ddd;padding:10px;z-index:10}button,select{margin:4px;padding:6px 9px}#plot{width:100%;height:760px;background:#fff;border:1px solid #ddd}.hint{font-size:13px;color:#444;line-height:1.45}</style></head><body>",
              "<h1>Interactive Episode Groups</h1>",
              "<div class='toolbar'><span>Group size: </span><span id='groupButtons'></span><button onclick='prevGroup()'>Prev group</button><button onclick='nextGroup()'>Next group</button><span> Dimension: </span><select id='dimSelect' onchange='setDim(parseInt(this.value))'></select><span> Mode: </span><select id='modeSelect' onchange='setMode(this.value)'><option value='overlay'>state + action</option><option value='state'>state</option><option value='action'>action</option></select><div id='status' class='hint'></div><div class='hint'>Keyboard: 1=single, 5=5 episodes, 0=10 episodes, 2=20 episodes, arrows switch group/dim, s/a/o switch mode.</div></div>",
-             "<div id='plot'></div>", "<script>", f"const EPISODES = {data_json};", f"const STATE_NAMES = {state_names_json};", f"const ACTION_NAMES = {action_names_json};", f"const GROUP_SIZES = {group_sizes_json};", f"let groupSize = {int(default_group_size)};", "let groupStart = 0; let dim = 0; let mode = 'overlay';"]
-    lines.append(r'''
+             "<div id='plot'></div>", "<script>"]
+    with html.open("w", encoding="utf-8") as stream:
+        stream.write("\n".join(lines))
+        stream.write("\nconst EPISODES = [\n")
+        first = True
+        with payload_path.open("r", encoding="utf-8") as payload_stream:
+            for line in payload_stream:
+                line = line.strip()
+                if not line:
+                    continue
+                if not first:
+                    stream.write(",\n")
+                stream.write(line)
+                first = False
+        stream.write("\n];\n")
+        stream.write(f"const STATE_NAMES = {state_names_json};\n")
+        stream.write(f"const ACTION_NAMES = {action_names_json};\n")
+        stream.write(f"const GROUP_SIZES = {group_sizes_json};\n")
+        stream.write(f"let groupSize = {int(default_group_size)};\n")
+        stream.write("let groupStart = 0; let dim = 0; let mode = 'overlay';\n")
+        stream.write(r'''
 function initControls(){const dimSelect=document.getElementById('dimSelect');for(let i=0;i<STATE_NAMES.length;i++){const opt=document.createElement('option');opt.value=String(i);opt.textContent=`${i}: state=${STATE_NAMES[i]} / action=${ACTION_NAMES[i]}`;dimSelect.appendChild(opt);}const groupButtons=document.getElementById('groupButtons');GROUP_SIZES.forEach(gs=>{const b=document.createElement('button');b.textContent=String(gs);b.onclick=()=>setGroupSize(gs);groupButtons.appendChild(b);});}
 function clampStart(){if(EPISODES.length===0){groupStart=0;return;}const maxStart=Math.max(0,EPISODES.length-groupSize);if(groupStart>maxStart)groupStart=maxStart;if(groupStart<0)groupStart=0;}
 function currentGroup(){clampStart();return EPISODES.slice(groupStart,groupStart+groupSize);}
@@ -362,8 +397,7 @@ function render(){const group=currentGroup();const traces=[];group.forEach(ep=>{
 document.addEventListener('keydown',(e)=>{if(e.target&&['INPUT','SELECT','TEXTAREA'].includes(e.target.tagName))return;if(e.key==='1')setGroupSize(1);else if(e.key==='5')setGroupSize(5);else if(e.key==='0')setGroupSize(10);else if(e.key==='2')setGroupSize(20);else if(e.key==='ArrowRight')nextGroup();else if(e.key==='ArrowLeft')prevGroup();else if(e.key==='ArrowDown')setDim(dim+1);else if(e.key==='ArrowUp')setDim(dim-1);else if(e.key.toLowerCase()==='s')setMode('state');else if(e.key.toLowerCase()==='a')setMode('action');else if(e.key.toLowerCase()==='o')setMode('overlay');});
 initControls();render();
 ''')
-    lines.append("</script></body></html>")
-    html.write_text("\n".join(lines), encoding="utf-8")
+        stream.write("\n</script></body></html>\n")
     return html
 
 
@@ -416,69 +450,63 @@ def main() -> None:
     print(f"[INFO] total_frames: {info.get('total_frames')}")
     print(f"[INFO] plot_mode: {args.plot_mode}")
 
-    episode_dfs: dict[int, pd.DataFrame] = {}
+    plotted_eps: list[int] = []
     manifest_rows: list[dict] = []
-    for ep_idx, parquet_path, df in collect_episode_groups(root):
-        if args.plot_mode == "none":
-            continue
-        if episode_filter is not None:
-            if ep_idx not in episode_filter:
+    interactive_enabled = args.interactive_groups or args.interactive_only
+    payload_path = plots_dir / ".interactive_episode_payload.jsonl"
+    payload_stream = payload_path.open("w", encoding="utf-8") if interactive_enabled else None
+    try:
+        for ep_idx, parquet_path, df in collect_episode_groups(root):
+            if args.plot_mode == "none":
                 continue
-        else:
-            if ep_idx < args.start:
-                continue
-            if args.end is not None and ep_idx >= args.end:
-                continue
-            if args.plot_mode == "episodes" and episode_filter is None:
-                continue
-        episode_dfs[int(ep_idx)] = df.copy()
-        manifest_rows.append({"episode_index": int(ep_idx), "frames": len(df), "parquet": str(parquet_path), "plot_dir": str(plots_dir / f"episode_{int(ep_idx):06d}")})
-
-    plotted_eps = sorted(episode_dfs.keys())
-    if plotted_eps:
-        if args.interactive_only:
-            print(
-                f"[INFO] loading {len(plotted_eps)} episodes "
-                "for interactive HTML only..."
-            )
-            html = None
-        else:
-            print(f"[INFO] plotting {len(plotted_eps)} episodes...")
-            for ep_idx in plotted_eps:
+            if episode_filter is None and args.end is not None and ep_idx >= args.end:
+                break
+            if episode_filter is not None:
+                if ep_idx not in episode_filter:
+                    continue
+            else:
+                if ep_idx < args.start:
+                    continue
+                if args.end is not None and ep_idx >= args.end:
+                    continue
+                if args.plot_mode == "episodes" and episode_filter is None:
+                    continue
+            ep_idx = int(ep_idx)
+            plotted_eps.append(ep_idx)
+            manifest_rows.append({"episode_index": ep_idx, "frames": len(df), "parquet": str(parquet_path), "plot_dir": str(plots_dir / f"episode_{ep_idx:06d}")})
+            if not args.interactive_only:
                 print(f"[PLOT] episode_{ep_idx:06d}")
                 draw_episode_plots(
-                    ep_idx,
-                    episode_dfs[ep_idx],
-                    info,
-                    plots_dir,
-                    fps,
-                    args.expected_dim,
-                    args.dpi,
-                    formats,
+                    ep_idx, df, info, plots_dir, fps, args.expected_dim,
+                    args.dpi, formats,
                     jump_reference_lines=args.jump_reference_lines,
                     arm_reference=args.arm_jump_reference,
                     gripper_reference=args.gripper_jump_reference,
-                    arm_dims=arm_dims,
-                    gripper_dims=gripper_dims,
+                    arm_dims=arm_dims, gripper_dims=gripper_dims,
                 )
-            html = write_html_index(out_dir, plotted_eps, formats)
+            if payload_stream is not None:
+                payload = build_interactive_episode_payload(
+                    ep_idx, df, fps, args.expected_dim, args.interactive_max_points
+                )
+                json.dump(payload, payload_stream, ensure_ascii=False, separators=(",", ":"))
+                payload_stream.write("\n")
+                payload_stream.flush()
+            del df
+            gc.collect()
+    finally:
+        if payload_stream is not None:
+            payload_stream.close()
 
-        html_interactive = (
-            write_interactive_group_html(
-                out_dir,
-                episode_dfs,
-                info,
-                fps,
-                args.expected_dim,
-                group_sizes,
-                args.interactive_default_group_size,
-            )
-            if args.interactive_groups or args.interactive_only
-            else None
+    plotted_eps.sort()
+    html = write_html_index(out_dir, plotted_eps, formats) if plotted_eps and not args.interactive_only else None
+    html_interactive = None
+    if plotted_eps and interactive_enabled:
+        html_interactive = write_interactive_group_html(
+            out_dir, payload_path, info, args.expected_dim, group_sizes,
+            args.interactive_default_group_size,
         )
-    else:
-        html = None
-        html_interactive = None
+    if payload_path.exists():
+        payload_path.unlink()
 
     manifest_csv = write_manifest_csv(out_dir, manifest_rows)
     print("\n[DONE]")
