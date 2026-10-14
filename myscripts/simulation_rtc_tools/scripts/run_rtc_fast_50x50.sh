@@ -43,7 +43,8 @@ while [[ $# -gt 0 ]]; do
 done
 
 case "$SETTING" in
-  demo_clean|demo_randomized) ;;
+  demo_clean) INSTRUCTION_TYPE=seen ;;
+  demo_randomized) INSTRUCTION_TYPE=unseen ;;
   *) echo "setting must be demo_clean or demo_randomized" >&2; exit 2 ;;
 esac
 
@@ -101,7 +102,7 @@ COMMAND=(bash "$HERE/start_robotwin_rtc_infer_and_eval.sh"
   --output_base "$TOOL/results/$LINGBOT_MODEL_ID/$LINGBOT_PRECISION/${SETTING#demo_}"
   --conda_sh "$LINGBOT_CONDA_SH"
   --inference_env lingbotvla --sim_env RoboTwin
-  --task_config "$SETTING" --start_port "$BASE_PORT"
+  --task_config "$SETTING" --instruction_type "$INSTRUCTION_TYPE" --start_port "$BASE_PORT"
   --num_tasks 50 --num_episodes "$EPISODES"
   --num_gpus 1 --num_per_gpu 1 --use_length 50
   --use_bf16 "$LINGBOT_USE_BF16" --use_fp32 "$LINGBOT_USE_FP32" --use_compile True --no_video

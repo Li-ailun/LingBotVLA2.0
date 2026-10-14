@@ -79,7 +79,7 @@ COMMAND=(bash "$HERE/start_robotwin_rtc_infer_and_eval.sh"
   --output_base "$TOOL/results/$LINGBOT_MODEL_ID/$LINGBOT_PRECISION/clean"
   --conda_sh "$LINGBOT_CONDA_SH"
   --inference_env lingbotvla --sim_env RoboTwin
-  --task_config demo_clean --task_name "$TASK"
+  --task_config demo_clean --instruction_type seen --task_name "$TASK"
   --num_tasks 1 --num_episodes "$EPISODES"
   --num_gpus 1 --num_per_gpu 1 --use_length 50
   --use_bf16 "$LINGBOT_USE_BF16" --use_fp32 "$LINGBOT_USE_FP32" --use_compile True --no_video

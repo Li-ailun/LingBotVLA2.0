@@ -26,6 +26,7 @@ def test_init_run_writes_model_precision_mode_and_rtc_config(tmp_path: Path) -> 
     result = subprocess.run([
         sys.executable, "-m", "evaluation.eval_provenance.cli", "init-run",
         "--run-dir", str(tmp_path), "--task-config", "demo_clean",
+        "--instruction-type", "seen",
         "--episodes", "50", "--action-chunk", "50",
         "--use-compile", "True", "--num-gpus", "1", "--num-servers", "1",
         "--gpu-ids", "2,5,8",
@@ -50,5 +51,6 @@ def test_init_run_writes_model_precision_mode_and_rtc_config(tmp_path: Path) -> 
         "switch_index": 30,
     }
     assert manifest["evaluation"]["episodes_per_task"] == 50
+    assert manifest["evaluation"]["instruction_type"] == "seen"
     assert manifest["inference"]["action_chunk"] == 50
     assert manifest["inference"]["physical_gpu_ids"] == [2, 5, 8]

@@ -44,7 +44,11 @@ if [[ -n "$GPU_IDS" && ! "$GPU_IDS" =~ ^[0-9]+(,[0-9]+)*$ ]]; then
   exit 2
 fi
 
-case "$SETTING" in demo_clean|demo_randomized) ;; *) exit 2 ;; esac
+case "$SETTING" in
+  demo_clean) INSTRUCTION_TYPE=seen ;;
+  demo_randomized) INSTRUCTION_TYPE=unseen ;;
+  *) exit 2 ;;
+esac
 source "$ROOT/evaluation/model_registry.sh"
 resolve_lingbot_model "$MODEL_NAME" "$ROOT"
 resolve_lingbot_precision "$PRECISION"
@@ -89,7 +93,8 @@ COMMAND=(bash "$ROOT/myscripts/simulation_rtc_tools/scripts/start_robotwin_rtc_i
   --output_base "$OUTPUT"
   --conda_sh "$LINGBOT_CONDA_SH"
   --inference_env lingbotvla --sim_env RoboTwin
-  --task_config "$SETTING" --num_tasks "$NUM_TASKS" --num_episodes "$EPISODES"
+  --task_config "$SETTING" --instruction_type "$INSTRUCTION_TYPE"
+  --num_tasks "$NUM_TASKS" --num_episodes "$EPISODES"
   --num_gpus 1 --num_per_gpu 1 --use_length 50
   --use_bf16 "$LINGBOT_USE_BF16" --use_fp32 "$LINGBOT_USE_FP32" --use_compile True --no_video
   "${EXTRA[@]}")

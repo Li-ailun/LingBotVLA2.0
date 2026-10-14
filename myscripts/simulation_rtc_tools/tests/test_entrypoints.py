@@ -24,6 +24,7 @@ def test_batch_dry_run_defaults_to_clean_50_by_50():
     assert "--num_tasks 50" in output
     assert "--num_episodes 50" in output
     assert "demo_clean" in output
+    assert "--instruction_type seen" in output
 
 
 def test_rtc_batch_supports_randomized_setting_and_separate_base_port():
@@ -34,6 +35,7 @@ def test_rtc_batch_supports_randomized_setting_and_separate_base_port():
     assert "--task_config demo_randomized" in output
     assert "results/step2000/bf16/randomized" in output
     assert "--start_port 9340" in output
+    assert "--instruction_type unseen" in output
 
 
 def test_rtc_batch_rejects_unknown_setting():
@@ -104,6 +106,7 @@ def test_full15k_rtc_video_uses_new_result_root_and_replay_seed():
     assert "evaluation/video_comparison/full15k/bf16/rtc/clean/" in output
     assert "place_empty_cup" in output
     assert "--start_seed 100012" in output
+    assert "--instruction_type seen" in output
 
 
 def test_rtc_batch_supports_fp32_and_resume_directory():

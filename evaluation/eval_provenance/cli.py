@@ -70,6 +70,7 @@ def build_metadata(args: argparse.Namespace) -> dict:
         ),
         "evaluation": {
             "task_config": args.task_config,
+            "instruction_type": args.instruction_type,
             "episodes_per_task": args.episodes,
             "start_seed": args.start_seed,
             "initial_episode_count": args.initial_episode_count,
@@ -125,6 +126,7 @@ def main() -> None:
     init = subparsers.add_parser("init-run")
     init.add_argument("--run-dir", required=True)
     init.add_argument("--task-config", required=True)
+    init.add_argument("--instruction-type", choices=("seen", "unseen"), required=True)
     init.add_argument("--episodes", type=int, required=True)
     init.add_argument("--action-chunk", type=int, required=True)
     init.add_argument("--use-compile", required=True)

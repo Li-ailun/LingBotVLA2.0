@@ -67,6 +67,7 @@ keep_inference=false
 validate_only=false
 enable_video=False
 task_config="${TASK_CONFIG:-demo_clean}"
+instruction_type=""
 task_name=""
 render_freq=0
 resume_run_dir=""
@@ -94,6 +95,7 @@ while [[ $# -gt 0 ]]; do
         --use_compile)       use_compile="$2";     shift 2 ;;
         --robo_name)         robo_name="$2";         shift 2 ;;
         --task_config)       task_config="$2";       shift 2 ;;
+        --instruction_type|--instruction-type) instruction_type="$2"; shift 2 ;;
         --task_name)         task_name="$2";         shift 2 ;;
         --render_freq)       render_freq="$2";       shift 2 ;;
         --resume_run_dir)    resume_run_dir="$2";    shift 2 ;;
@@ -141,6 +143,18 @@ while [[ $# -gt 0 ]]; do
             echo -e "\033[31mUnknown argument: $1\033[0m"; exit 1 ;;
     esac
 done
+
+if [ -z "$instruction_type" ]; then
+    case "$task_config" in
+        demo_clean) instruction_type=seen ;;
+        demo_randomized) instruction_type=unseen ;;
+        *) echo "Cannot infer instruction type for task config: $task_config" >&2; exit 2 ;;
+    esac
+fi
+case "$instruction_type" in
+    seen|unseen) ;;
+    *) echo "instruction_type must be seen or unseen: $instruction_type" >&2; exit 2 ;;
+esac
 
 declare -a selected_gpu_ids=()
 if [[ -n "$gpu_ids" ]]; then
@@ -532,6 +546,7 @@ launch_task() {
         --overrides \
         --task_name ${task_name} \
         --task_config ${task_config} \
+        --instruction_type ${instruction_type} \
         --num_episodes ${num_episodes} \
         --train_config_name ${train_config_name} \
         --seed ${seed} \

@@ -33,6 +33,7 @@ def test_non_rtc_selects_full5k_without_copying_checkpoint():
     assert "eval_policy_client_lingbotvla_recording.py" in output
     assert "LINGBOT_EVAL_MODE=non_rtc" in output
     assert "LINGBOT_PROVENANCE_ENABLED=1" in output
+    assert "--instruction_type seen" in output
 
 
 def test_non_rtc_selects_full15k_and_separates_results():
@@ -58,6 +59,7 @@ def test_full15k_non_rtc_randomized_fp32_uses_new_result_root():
     assert "--use_bf16 False" in output
     assert "--use_fp32 True" in output
     assert "--gpu_ids 0\\,6\\,8" in output
+    assert "--instruction_type unseen" in output
 
 
 def test_full15k_non_rtc_video_uses_new_result_root_and_replay_seed():
@@ -70,6 +72,7 @@ def test_full15k_non_rtc_video_uses_new_result_root_and_replay_seed():
     assert "models/lingbot_full_5k_6_60" in output
     assert "evaluation/video_comparison/full15k/bf16/non_rtc/clean/place_empty_cup" in output
     assert "--start_seed 100012" in output
+    assert "--instruction_type seen" in output
 
 
 def test_non_rtc_runs_project_module_from_project_root():

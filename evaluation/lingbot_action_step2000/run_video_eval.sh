@@ -45,7 +45,8 @@ resolve_lingbot_model "$MODEL_NAME" "$ROOT"
 resolve_lingbot_precision "$PRECISION"
 
 case "$SETTING" in
-  demo_clean|demo_randomized) ;;
+  demo_clean) INSTRUCTION_TYPE=seen ;;
+  demo_randomized) INSTRUCTION_TYPE=unseen ;;
   *) echo "setting must be demo_clean or demo_randomized" >&2; exit 2 ;;
 esac
 [[ "$EPISODES" =~ ^[1-9][0-9]*$ ]] || { echo "episodes must be a positive integer" >&2; exit 2; }
@@ -82,7 +83,8 @@ COMMAND=(bash "$HERE/video_eval_launcher/start_robotwin_video_infer_and_eval.sh"
   --output_base "$ROOT/evaluation/video_comparison/$LINGBOT_MODEL_ID/$LINGBOT_PRECISION/non_rtc/${SETTING#demo_}/$TASK_DIR"
   --conda_sh "$LINGBOT_CONDA_SH"
   --inference_env lingbotvla --sim_env RoboTwin
-  --task_config "$SETTING" --num_tasks "$NUM_TASKS" --num_episodes "$EPISODES"
+  --task_config "$SETTING" --instruction_type "$INSTRUCTION_TYPE"
+  --num_tasks "$NUM_TASKS" --num_episodes "$EPISODES"
   --num_gpus 1 --num_per_gpu 1 --use_length 50
   --use_bf16 "$LINGBOT_USE_BF16" --use_fp32 "$LINGBOT_USE_FP32" --use_compile True
   --render_freq 0 --video_fps "$VIDEO_FPS" --video
