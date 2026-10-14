@@ -20,11 +20,15 @@ place_dual_shoes                 Success rate: 1/50 => 2.0%, current seed: 10008
 place_empty_cup                  Success rate: 4/50 => 8.0%, current seed: 100058
 place_fan                        Success rate: 0/50 => 0.0%, current seed: 100070
 place_mouse_pad                  Success rate: 0/50 => 0.0%, current seed: 100057
-place_object_basket              Success rate: 1/29 => 3.4%, current seed: 100054
-place_object_scale               Success rate: 1/32 => 3.1%, current seed: 100046
-place_object_stand               Success rate: 1/22 => 4.5%, current seed: 100024
+place_object_basket              Success rate: 1/34 => 2.9%, current seed: 100061
+place_object_scale               Success rate: 2/44 => 4.5%, current seed: 100061
+place_object_stand               Success rate: 1/33 => 3.0%, current seed: 100036
 place_shoe                       Success rate: 1/50 => 2.0%, current seed: 100069
 put_object_cabinet               Success rate: 0/50 => 0.0%, current seed: 100891
 scan_object                      Success rate: 1/50 => 2.0%, current seed: 100184
 stack_blocks_three               Success rate: 0/50 => 0.0%, current seed: 100060
 stack_bowls_three                Success rate: 0/50 => 0.0%, current seed: 100102
+
+
+
+百分之十左右
