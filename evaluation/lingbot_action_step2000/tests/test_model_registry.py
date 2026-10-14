@@ -48,6 +48,40 @@ def test_full5k_uses_its_exported_training_config_and_shared_dependency_root():
     ]
 
 
+def test_registry_resolves_flat_full15k_weights_with_full5k_auxiliary_assets():
+    result = resolve("full15k")
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.splitlines() == [
+        "full15k",
+        str(ROOT / "models/lingbot_15K"),
+        str(ROOT / "models/lingbot_full_5k_6_60"),
+    ]
+
+
+def test_registry_accepts_all_full15k_aliases():
+    for alias in ("full15k", "15k", "lingbot_15K"):
+        result = resolve(alias)
+        assert result.returncode == 0, result.stderr
+        assert result.stdout.splitlines()[0] == "full15k"
+
+
+def test_full15k_reuses_exact_full5k_configuration_paths():
+    command = (
+        f'set -e; source "{REGISTRY}"; resolve_lingbot_model full15k "{ROOT}"; '
+        "printf '%s\\n%s\\n%s\\n%s\\n' "
+        '"$LINGBOT_NORM_STATS" "$LINGBOT_ROBOT_CONFIG" '
+        '"$LINGBOT_TRAINING_CONFIG" "$LINGBOT_MODELS_ROOT"'
+    )
+    result = subprocess.run(["bash", "-c", command], text=True, capture_output=True)
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.splitlines() == [
+        str(ROOT / "models/lingbot_full_5k_6_60/assets/norm_stats/robotwin_clean.json"),
+        str(ROOT / "models/lingbot_full_5k_6_60/configs/robot_configs_clean/robotwin.yaml"),
+        str(ROOT / "models/lingbot_full_5k_6_60/lingbotvla_cli.yaml"),
+        str(ROOT / "models"),
+    ]
+
+
 def test_registry_rejects_unknown_model():
     result = resolve("unknown")
     assert result.returncode != 0

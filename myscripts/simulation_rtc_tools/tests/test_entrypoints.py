@@ -63,6 +63,49 @@ def test_rtc_batch_selects_full5k_and_separates_results():
     assert "LINGBOT_PROVENANCE_ENABLED=1" in output
 
 
+def test_rtc_batch_selects_full15k_and_separates_results():
+    output = run(
+        "bash", str(TOOL / "scripts/run_rtc_fast_50x50.sh"),
+        "--model", "full15k", "--precision", "bf16", "--dry-run",
+    )
+    assert "--model_path" in output
+    assert "models/lingbot_15K" in output
+    assert "models/lingbot_full_5k_6_60" in output
+    assert "results/full15k/bf16/clean" in output
+
+
+def test_full15k_rtc_randomized_fp32_uses_new_result_root_and_port():
+    output = run(
+        "bash", str(TOOL / "scripts/run_rtc_fast_50x50.sh"),
+        "--model", "full15k", "--precision", "fp32",
+        "--setting", "demo_randomized", "--episodes", "50",
+        "--gpu-ids", "0,6,8", "--base-port", "9340", "--dry-run",
+    )
+    assert "models/lingbot_15K" in output
+    assert "models/lingbot_full_5k_6_60" in output
+    assert "results/full15k/fp32/randomized" in output
+    assert "--task_config demo_randomized" in output
+    assert "--num_episodes 50" in output
+    assert "--start_port 9340" in output
+    assert "--use_bf16 False" in output
+    assert "--use_fp32 True" in output
+    assert "--gpu_ids 0\\,6\\,8" in output
+
+
+def test_full15k_rtc_video_uses_new_result_root_and_replay_seed():
+    output = run(
+        "bash", str(TOOL / "scripts/run_rtc_video_eval.sh"),
+        "--model", "full15k", "--precision", "bf16",
+        "--setting", "demo_clean", "--task", "place_empty_cup",
+        "--episodes", "1", "--start-seed", "100012", "--dry-run",
+    )
+    assert "models/lingbot_15K" in output
+    assert "models/lingbot_full_5k_6_60" in output
+    assert "evaluation/video_comparison/full15k/bf16/rtc/clean/" in output
+    assert "place_empty_cup" in output
+    assert "--start_seed 100012" in output
+
+
 def test_rtc_batch_supports_fp32_and_resume_directory():
     resume = "/tmp/full5k-rtc-resume"
     output = run(

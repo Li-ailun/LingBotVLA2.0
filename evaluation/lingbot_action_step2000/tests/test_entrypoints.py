@@ -35,6 +35,43 @@ def test_non_rtc_selects_full5k_without_copying_checkpoint():
     assert "LINGBOT_PROVENANCE_ENABLED=1" in output
 
 
+def test_non_rtc_selects_full15k_and_separates_results():
+    output = dry(
+        "run_eval.sh", "demo_clean", "--model", "full15k", "--precision", "bf16"
+    )
+    assert "--model_path" in output
+    assert "models/lingbot_15K" in output
+    assert "LINGBOT_MODEL_ASSET_ROOT=" in output
+    assert "models/lingbot_full_5k_6_60" in output
+    assert "results/full15k/bf16/clean" in output
+
+
+def test_full15k_non_rtc_randomized_fp32_uses_new_result_root():
+    output = dry(
+        "run_eval.sh", "demo_randomized", "--model", "full15k",
+        "--precision", "fp32", "--episodes", "50", "--gpu-ids", "0,6,8",
+    )
+    assert "models/lingbot_15K" in output
+    assert "results/full15k/fp32/randomized" in output
+    assert "--task_config demo_randomized" in output
+    assert "--num_episodes 50" in output
+    assert "--use_bf16 False" in output
+    assert "--use_fp32 True" in output
+    assert "--gpu_ids 0\\,6\\,8" in output
+
+
+def test_full15k_non_rtc_video_uses_new_result_root_and_replay_seed():
+    output = dry(
+        "run_video_eval.sh", "demo_clean", "--model", "full15k",
+        "--precision", "bf16", "--task", "place_empty_cup",
+        "--episodes", "1", "--start-seed", "100012",
+    )
+    assert "models/lingbot_15K" in output
+    assert "models/lingbot_full_5k_6_60" in output
+    assert "evaluation/video_comparison/full15k/bf16/non_rtc/clean/place_empty_cup" in output
+    assert "--start_seed 100012" in output
+
+
 def test_non_rtc_runs_project_module_from_project_root():
     output = dry(
         "run_eval.sh", "demo_clean", "--model", "full5k", "--precision", "bf16"

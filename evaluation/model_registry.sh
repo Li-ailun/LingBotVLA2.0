@@ -17,7 +17,15 @@ resolve_lingbot_model() {
       LINGBOT_MODEL_PATH="$LINGBOT_MODEL_ASSET_ROOT/checkpoints/global_step_5000/hf_ckpt"
       LINGBOT_TRAINING_CONFIG="$LINGBOT_MODEL_ASSET_ROOT/lingbotvla_cli.yaml"
       LINGBOT_ROBOT_CONFIG="$LINGBOT_MODEL_ASSET_ROOT/configs/robot_configs_clean/robotwin.yaml" ;;
-    *) echo "Unknown model '$requested' (expected: step2000 or full5k)" >&2; return 2 ;;
+    full15k|15k|lingbot_15K)
+      LINGBOT_MODEL_ID=full15k
+      LINGBOT_MODEL_PATH="$root/models/lingbot_15K"
+      # The 15k export contains only the continued HF weights. It uses the
+      # unchanged full5k normalization, robot, and training configuration.
+      LINGBOT_MODEL_ASSET_ROOT="$root/models/lingbot_full_5k_6_60"
+      LINGBOT_TRAINING_CONFIG="$LINGBOT_MODEL_ASSET_ROOT/lingbotvla_cli.yaml"
+      LINGBOT_ROBOT_CONFIG="$LINGBOT_MODEL_ASSET_ROOT/configs/robot_configs_clean/robotwin.yaml" ;;
+    *) echo "Unknown model '$requested' (expected: step2000, full5k, or full15k)" >&2; return 2 ;;
   esac
   LINGBOT_NORM_STATS="$LINGBOT_MODEL_ASSET_ROOT/assets/norm_stats/robotwin_clean.json"
   LINGBOT_MODELS_ROOT="$root/models"
