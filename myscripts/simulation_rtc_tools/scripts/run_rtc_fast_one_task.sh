@@ -13,6 +13,7 @@ MODEL_NAME=step2000
 PRECISION=bf16
 RESUME_RUN_DIR=""
 GPU_IDS=""
+INSTRUCTION_TYPE=unseen
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --task) TASK="$2"; shift 2 ;;
@@ -23,6 +24,7 @@ while [[ $# -gt 0 ]]; do
     --resume-run-dir) RESUME_RUN_DIR="$2"; shift 2 ;;
     --gpu|--gpu-id|--gpu_id) GPU_IDS="$2"; shift 2 ;;
     --gpu-ids|--gpu_ids) GPU_IDS="$2"; shift 2 ;;
+    --instruction-type|--instruction_type) INSTRUCTION_TYPE="$2"; shift 2 ;;
     --request-index) export LINGBOT_RTC_REQUEST_INDEX="$2"; shift 2 ;;
     --execution-horizon) export LINGBOT_RTC_EXECUTION_HORIZON="$2"; shift 2 ;;
     --fixed-delay-steps) export LINGBOT_RTC_FIXED_DELAY_STEPS="$2"; shift 2 ;;
@@ -38,6 +40,10 @@ done
   echo "GPU ids must be comma-separated non-negative integers: $GPU_IDS" >&2; exit 2;
 }
 [[ -n "$TASK" ]] || { echo "usage: $0 TASK|--task TASK [options]" >&2; exit 2; }
+case "$INSTRUCTION_TYPE" in
+  seen|unseen) ;;
+  *) echo "instruction type must be seen or unseen: $INSTRUCTION_TYPE" >&2; exit 2 ;;
+esac
 
 source "$ROOT/evaluation/model_registry.sh"
 resolve_lingbot_model "$MODEL_NAME" "$ROOT"
@@ -79,7 +85,7 @@ COMMAND=(bash "$HERE/start_robotwin_rtc_infer_and_eval.sh"
   --output_base "$TOOL/results/$LINGBOT_MODEL_ID/$LINGBOT_PRECISION/clean"
   --conda_sh "$LINGBOT_CONDA_SH"
   --inference_env lingbotvla --sim_env RoboTwin
-  --task_config demo_clean --instruction_type seen --task_name "$TASK"
+  --task_config demo_clean --instruction_type "$INSTRUCTION_TYPE" --task_name "$TASK"
   --num_tasks 1 --num_episodes "$EPISODES"
   --num_gpus 1 --num_per_gpu 1 --use_length 50
   --use_bf16 "$LINGBOT_USE_BF16" --use_fp32 "$LINGBOT_USE_FP32" --use_compile True --no_video

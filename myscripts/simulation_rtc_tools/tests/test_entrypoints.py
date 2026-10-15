@@ -24,7 +24,7 @@ def test_batch_dry_run_defaults_to_clean_50_by_50():
     assert "--num_tasks 50" in output
     assert "--num_episodes 50" in output
     assert "demo_clean" in output
-    assert "--instruction_type seen" in output
+    assert "--instruction_type unseen" in output
 
 
 def test_rtc_batch_supports_randomized_setting_and_separate_base_port():
@@ -106,7 +106,27 @@ def test_full15k_rtc_video_uses_new_result_root_and_replay_seed():
     assert "evaluation/video_comparison/full15k/bf16/rtc/clean/" in output
     assert "place_empty_cup" in output
     assert "--start_seed 100012" in output
+    assert "--instruction_type unseen" in output
+
+
+def test_rtc_batch_can_explicitly_override_instruction_type_to_seen():
+    output = run(
+        "bash", str(TOOL / "scripts/run_rtc_fast_50x50.sh"),
+        "--setting", "demo_clean", "--instruction-type", "seen", "--dry-run",
+    )
     assert "--instruction_type seen" in output
+
+
+def test_rtc_batch_rejects_invalid_instruction_type():
+    result = subprocess.run(
+        [
+            "bash", str(TOOL / "scripts/run_rtc_fast_50x50.sh"),
+            "--instruction-type", "invalid", "--dry-run",
+        ],
+        cwd=ROOT, text=True, capture_output=True,
+    )
+    assert result.returncode == 2
+    assert "instruction type must be seen or unseen" in result.stderr
 
 
 def test_rtc_batch_supports_fp32_and_resume_directory():
@@ -161,6 +181,7 @@ def test_launcher_contains_explicit_gpu_list_mapping_and_validation():
     )
     assert "physical_gpu_ids=2,5,8" in output
     assert "num_gpus=3" in output
+    assert "instruction_type=unseen" in output
 
 
 def test_rtc_client_uses_selected_model_asset_root():

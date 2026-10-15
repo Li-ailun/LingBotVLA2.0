@@ -33,7 +33,7 @@ def test_non_rtc_selects_full5k_without_copying_checkpoint():
     assert "eval_policy_client_lingbotvla_recording.py" in output
     assert "LINGBOT_EVAL_MODE=non_rtc" in output
     assert "LINGBOT_PROVENANCE_ENABLED=1" in output
-    assert "--instruction_type seen" in output
+    assert "--instruction_type unseen" in output
 
 
 def test_non_rtc_selects_full15k_and_separates_results():
@@ -72,7 +72,27 @@ def test_full15k_non_rtc_video_uses_new_result_root_and_replay_seed():
     assert "models/lingbot_full_5k_6_60" in output
     assert "evaluation/video_comparison/full15k/bf16/non_rtc/clean/place_empty_cup" in output
     assert "--start_seed 100012" in output
+    assert "--instruction_type unseen" in output
+
+
+def test_non_rtc_can_explicitly_override_instruction_type_to_seen():
+    output = dry(
+        "run_eval.sh", "demo_clean", "--model", "full5k",
+        "--instruction-type", "seen",
+    )
     assert "--instruction_type seen" in output
+
+
+def test_non_rtc_rejects_invalid_instruction_type():
+    result = subprocess.run(
+        [
+            "bash", str(ROOT / "run_eval.sh"), "demo_clean",
+            "--instruction-type", "invalid", "--dry-run",
+        ],
+        text=True, capture_output=True,
+    )
+    assert result.returncode == 2
+    assert "instruction type must be seen or unseen" in result.stderr
 
 
 def test_non_rtc_runs_project_module_from_project_root():
@@ -194,3 +214,13 @@ def test_video_launcher_deploys_an_isolated_fresh_frame_client():
     assert "eval_policy_client_lingbotvla_video.py" in launcher
     assert 'eval_client_dst="${eval_workdir}/script/eval_policy_client_lingbotvla_video.py"' in launcher
     assert 'eval_client_dst="${eval_workdir}/script/eval_policy_client_lingbotvla.py"' not in launcher
+
+
+def test_low_level_video_launcher_defaults_clean_to_unseen():
+    launcher = ROOT / "video_eval_launcher/start_robotwin_video_infer_and_eval.sh"
+    result = subprocess.run(
+        ["bash", str(launcher), "--validate_only", "--task_config", "demo_clean"],
+        text=True, capture_output=True,
+    )
+    assert result.returncode == 0, result.stderr
+    assert "instruction_type=unseen" in result.stdout

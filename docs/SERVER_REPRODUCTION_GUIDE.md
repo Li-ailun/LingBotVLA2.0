@@ -403,6 +403,18 @@ bash evaluation/lingbot_action_step2000/run_eval.sh \
 
 指定GPU只需在命令末尾追加 `--gpu 8`。
 
+### 8.1 比赛语言指令设置
+
+赛事评测入口默认对 `demo_clean` 和 `demo_randomized` 都使用
+`instruction_type=unseen`。`seen/unseen` 只选择发送给模型的语言描述集合，
+不会改变场景、seed、物体、相机、step limit或成功判定。正式提交时建议在命令中
+显式写出 `--instruction-type unseen`，便于日志审计；不写时默认值同样是
+`unseen`。研究语言指令影响时可显式使用 `--instruction-type seen`，但该结果应与
+正式 unseen 结果分开标记。
+
+天池正式统计要求每个任务100次；本文中的50次命令用于阶段性评测，正式提交时将
+`--episodes 50` 改为 `--episodes 100`。
+
 ## 9. RTC评测
 
 当前full5k正式参数：

@@ -18,6 +18,7 @@ START_SEED=""
 GPU_IDS=""
 SETTING="demo_clean"
 BASE_PORT=9330
+INSTRUCTION_TYPE=unseen
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --dry-run) DRY_RUN=true; shift ;;
@@ -32,6 +33,7 @@ while [[ $# -gt 0 ]]; do
     --gpu|--gpu-id|--gpu_id) GPU_IDS="$2"; shift 2 ;;
     --gpu-ids|--gpu_ids) GPU_IDS="$2"; shift 2 ;;
     --setting) SETTING="$2"; shift 2 ;;
+    --instruction-type|--instruction_type) INSTRUCTION_TYPE="$2"; shift 2 ;;
     --base-port|--base_port|--start-port|--start_port) BASE_PORT="$2"; shift 2 ;;
     --request-index) export LINGBOT_RTC_REQUEST_INDEX="$2"; shift 2 ;;
     --execution-horizon) export LINGBOT_RTC_EXECUTION_HORIZON="$2"; shift 2 ;;
@@ -42,10 +44,10 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-case "$SETTING" in
-  demo_clean) INSTRUCTION_TYPE=seen ;;
-  demo_randomized) INSTRUCTION_TYPE=unseen ;;
-  *) echo "setting must be demo_clean or demo_randomized" >&2; exit 2 ;;
+case "$SETTING" in demo_clean|demo_randomized) ;; *) echo "setting must be demo_clean or demo_randomized" >&2; exit 2 ;; esac
+case "$INSTRUCTION_TYPE" in
+  seen|unseen) ;;
+  *) echo "instruction type must be seen or unseen: $INSTRUCTION_TYPE" >&2; exit 2 ;;
 esac
 
 if [[ ! "$BASE_PORT" =~ ^[0-9]+$ ]] || (( BASE_PORT < 1 || BASE_PORT > 65535 )); then

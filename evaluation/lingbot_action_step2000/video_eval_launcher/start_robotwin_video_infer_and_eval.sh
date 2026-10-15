@@ -146,8 +146,7 @@ done
 
 if [ -z "$instruction_type" ]; then
     case "$task_config" in
-        demo_clean) instruction_type=seen ;;
-        demo_randomized) instruction_type=unseen ;;
+        demo_clean|demo_randomized) instruction_type=unseen ;;
         *) echo "Cannot infer instruction type for task config: $task_config" >&2; exit 2 ;;
     esac
 fi
@@ -185,6 +184,7 @@ if $validate_only; then
     echo "num_episodes=${num_episodes}"
     echo "num_gpus=${num_gpus}"
     echo "physical_gpu_ids=${gpu_ids}"
+    echo "instruction_type=${instruction_type}"
     echo "client_override=--num_episodes ${num_episodes}"
     echo "task_name=${task_name}"
     echo "render_freq=${render_freq}"

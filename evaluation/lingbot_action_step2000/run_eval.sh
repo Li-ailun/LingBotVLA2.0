@@ -20,6 +20,7 @@ INITIAL_EPISODE_COUNT=0
 INITIAL_SUCCESS_COUNT=0
 START_SEED=""
 GPU_IDS=""
+INSTRUCTION_TYPE=unseen
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --task) TASK="$2"; shift 2 ;;
@@ -33,6 +34,7 @@ while [[ $# -gt 0 ]]; do
     --start-seed) START_SEED="$2"; shift 2 ;;
     --gpu|--gpu-id|--gpu_id) GPU_IDS="$2"; shift 2 ;;
     --gpu-ids|--gpu_ids) GPU_IDS="$2"; shift 2 ;;
+    --instruction-type|--instruction_type) INSTRUCTION_TYPE="$2"; shift 2 ;;
     --realtime) REALTIME=true; shift ;;
     --dry-run) DRY_RUN=true; shift ;;
     *) echo "Unknown option: $1" >&2; exit 2 ;;
@@ -44,10 +46,10 @@ if [[ -n "$GPU_IDS" && ! "$GPU_IDS" =~ ^[0-9]+(,[0-9]+)*$ ]]; then
   exit 2
 fi
 
-case "$SETTING" in
-  demo_clean) INSTRUCTION_TYPE=seen ;;
-  demo_randomized) INSTRUCTION_TYPE=unseen ;;
-  *) exit 2 ;;
+case "$SETTING" in demo_clean|demo_randomized) ;; *) exit 2 ;; esac
+case "$INSTRUCTION_TYPE" in
+  seen|unseen) ;;
+  *) echo "instruction type must be seen or unseen: $INSTRUCTION_TYPE" >&2; exit 2 ;;
 esac
 source "$ROOT/evaluation/model_registry.sh"
 resolve_lingbot_model "$MODEL_NAME" "$ROOT"
