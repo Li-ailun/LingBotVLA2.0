@@ -60,6 +60,8 @@ datasets/r1pro_mcap_raw/stack_plates_and_cups/
 
 交互流程：
 
+- 选择操作员和子任务后，输入本次起始 MCAP episode 序号；直接按 `Enter` 接受建议值。
+- 已有同号 `episode_XXXXXX_*` 时会拒绝并要求重新输入，不会覆盖。
 - 准备好后按 `Enter` 启动一个 episode。
 - 录制中按 `Enter` 停止并保存。
 - 录制中输入 `q` 后按 `Enter`，取消并删除当前 episode；编号不会增加，可以重录。

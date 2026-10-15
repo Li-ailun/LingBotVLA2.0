@@ -152,6 +152,13 @@ def str2bool(x):
     raise argparse.ArgumentTypeError(f"Invalid boolean value: {x}")
 
 
+def apply_recording_mode(args):
+    """Resolve the direct-recording shortcut onto the legacy monitor flag."""
+    if getattr(args, "direct_recording", False):
+        args.enable_timestamp_monitor = False
+    return args
+
+
 def safe_task_dir_name(task: str) -> str:
     text = str(task).strip()
     safe = "".join(ch if (ch.isalnum() or ch in "-_.") else "_" for ch in text)
@@ -299,6 +306,57 @@ def get_next_episode_index(task_dir: Path) -> int:
             except Exception:
                 pass
     return max(eps) + 1 if eps else 0
+
+
+def episode_directories_for_index(task_dir: Path, episode_index: int) -> list[str]:
+    """Return existing episode directories that use the requested MCAP index."""
+    index = int(episode_index)
+    if index < 0:
+        raise ValueError("episode index must be a non-negative integer")
+    prefix = f"episode_{index:06d}"
+    return [
+        str(path)
+        for path in sorted(task_dir.glob(f"{prefix}*"))
+        if path.is_dir() and (path.name == prefix or path.name.startswith(prefix + "_"))
+    ]
+
+
+def prompt_start_episode_index(task_dir: Path, input_fn=input, print_fn=print) -> int:
+    """Prompt until a non-negative, unused MCAP episode index is selected."""
+    recommended = get_next_episode_index(task_dir)
+    while True:
+        raw = input_fn(f"Start episode index [recommended: {recommended}]: ").strip()
+        if raw == "":
+            candidate = recommended
+        else:
+            try:
+                candidate = int(raw)
+            except ValueError:
+                print_fn("[EPISODE INDEX] Enter a non-negative integer.")
+                continue
+        if candidate < 0:
+            print_fn("[EPISODE INDEX] Enter a non-negative integer.")
+            continue
+
+        existing = episode_directories_for_index(task_dir, candidate)
+        if existing:
+            print_fn(
+                f"[EPISODE INDEX] episode_{candidate:06d} already exists: "
+                + ", ".join(existing)
+            )
+            continue
+        return candidate
+
+
+def require_available_episode_index(task_dir: Path, episode_index: int) -> int:
+    """Validate an explicitly supplied non-negative MCAP episode index."""
+    index = int(episode_index)
+    existing = episode_directories_for_index(task_dir, index)
+    if existing:
+        raise ValueError(
+            f"episode_{index:06d} already exists: " + ", ".join(existing)
+        )
+    return index
 
 
 class TimestampMonitorNode(Node):
@@ -1331,15 +1389,29 @@ def run_manual_loop(args):
         print("[MONITOR] DISABLED: no extra timestamp-monitor subscriptions will be created.")
 
     try:
-        episode_index = (
-            get_next_episode_index(task_dir)
-            if args.episode_index == "auto"
-            else int(args.episode_index)
-        )
+        if args.episode_index == "auto":
+            episode_index = prompt_start_episode_index(task_dir)
+        else:
+            try:
+                episode_index = require_available_episode_index(
+                    task_dir, int(args.episode_index)
+                )
+            except (TypeError, ValueError) as exc:
+                print(color_text(f"[EPISODE INDEX] {exc}", COLOR_RED))
+                episode_index = prompt_start_episode_index(task_dir)
 
         while True:
             if monitor_enabled and not rclpy.ok():
                 break
+
+            existing = episode_directories_for_index(task_dir, episode_index)
+            if existing:
+                print(color_text(
+                    f"[EPISODE INDEX] episode_{episode_index:06d} already exists: "
+                    + ", ".join(existing),
+                    COLOR_RED,
+                ))
+                episode_index = prompt_start_episode_index(task_dir)
 
             action_word = "PREPARE" if monitor_enabled else "START DIRECT RECORDING"
             cmd = input(
@@ -1359,7 +1431,7 @@ def run_manual_loop(args):
                 spec = apply_instruction(args, cmd)
                 task_dir = task_directory(root, args)
                 task_dir.mkdir(parents=True, exist_ok=True)
-                episode_index = get_next_episode_index(task_dir)
+                episode_index = prompt_start_episode_index(task_dir)
                 print(color_text(
                     f"[MANUAL] Switched to {spec.instruction_id}: {spec.text}",
                     COLOR_GREEN,
@@ -1432,6 +1504,14 @@ def main():
             "False: do not create monitor subscriptions; start rosbag directly."
         ),
     )
+    parser.add_argument(
+        "--direct-recording",
+        action="store_true",
+        help=(
+            "Start rosbag directly without topic readiness, subscriber matching, "
+            "or timestamp monitoring. Equivalent to --enable-timestamp-monitor false."
+        ),
+    )
 
     parser.add_argument(
         "--timestamp-max-span",
@@ -1480,6 +1560,7 @@ def main():
     parser.add_argument("--warmup-timeout", type=float, default=10.0)
 
     args = parser.parse_args()
+    apply_recording_mode(args)
     if args.operator_id:
         try:
             args.operator_id = resolve_operator(args.operator_id)

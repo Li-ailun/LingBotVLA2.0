@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import subprocess
 from pathlib import Path
+from tempfile import TemporaryDirectory
 
 
 SCRIPT = Path(__file__).parents[1] / "record_tools" / "record_r1pro_mcap_episode.py"
@@ -136,3 +137,65 @@ def test_recorder_cli_exposes_operator_option() -> None:
     )
     assert result.returncode == 0, result.stderr
     assert "--operator" in result.stdout
+
+
+def test_direct_recording_cli_disables_timestamp_monitor() -> None:
+    result = _run_python(
+        "import importlib.util,json,types;"
+        f"s=importlib.util.spec_from_file_location('recorder',{str(SCRIPT)!r});"
+        "m=importlib.util.module_from_spec(s);s.loader.exec_module(m);"
+        "args=types.SimpleNamespace(enable_timestamp_monitor=True,direct_recording=True);"
+        "m.apply_recording_mode(args);"
+        "print(json.dumps({'monitor':args.enable_timestamp_monitor}))"
+    )
+    assert result.returncode == 0, result.stderr
+    assert json.loads(result.stdout) == {"monitor": False}
+
+
+def test_recorder_cli_exposes_direct_recording_option() -> None:
+    result = subprocess.run(
+        ["/usr/bin/python3", str(SCRIPT), "--help"],
+        capture_output=True, text=True, check=False,
+    )
+    assert result.returncode == 0, result.stderr
+    assert "--direct-recording" in result.stdout
+
+
+def test_episode_index_collision_matches_timestamped_episode_directories() -> None:
+    with TemporaryDirectory() as tmp:
+        task_dir = Path(tmp)
+        (task_dir / "episode_000125_20261015120000000").mkdir()
+        (task_dir / "episode_000126_20261015120100000").mkdir()
+        result = _run_python(
+            "import importlib.util,json,pathlib;"
+            f"s=importlib.util.spec_from_file_location('recorder',{str(SCRIPT)!r});"
+            "m=importlib.util.module_from_spec(s);s.loader.exec_module(m);"
+            f"d=pathlib.Path({str(task_dir)!r});"
+            "print(json.dumps({'used':m.episode_directories_for_index(d,125),"
+            "'free':m.episode_directories_for_index(d,127)}))"
+        )
+    assert result.returncode == 0, result.stderr
+    payload = json.loads(result.stdout)
+    assert len(payload["used"]) == 1
+    assert payload["used"][0].endswith("episode_000125_20261015120000000")
+    assert payload["free"] == []
+
+
+def test_start_episode_prompt_rejects_duplicate_then_accepts_free_index() -> None:
+    with TemporaryDirectory() as tmp:
+        task_dir = Path(tmp)
+        (task_dir / "episode_000125_20261015120000000").mkdir()
+        result = _run_python(
+            "import importlib.util,json,pathlib;"
+            f"s=importlib.util.spec_from_file_location('recorder',{str(SCRIPT)!r});"
+            "m=importlib.util.module_from_spec(s);s.loader.exec_module(m);"
+            f"d=pathlib.Path({str(task_dir)!r});"
+            "answers=iter(['125','bad','127']);messages=[];"
+            "chosen=m.prompt_start_episode_index(d,input_fn=lambda _:next(answers),print_fn=messages.append);"
+            "print(json.dumps({'chosen':chosen,'messages':messages}))"
+        )
+    assert result.returncode == 0, result.stderr
+    payload = json.loads(result.stdout)
+    assert payload["chosen"] == 127
+    assert any("already exists" in message for message in payload["messages"])
+    assert any("non-negative integer" in message for message in payload["messages"])
