@@ -21,3 +21,18 @@ bash scripts/create_eval_environments.sh \
 ```
 
 已有同名环境时默认拒绝覆盖；只有明确传入`--update`才会更新。先检查命令而不创建环境可追加`--dry-run`。
+
+大型文件按`assets-full30k.json`放入相对路径后，执行只读验证：
+
+```bash
+unset LD_LIBRARY_PATH
+export LINGBOTVLA_PYTHON=/path/to/conda-envs/lingbotvla/bin/python
+export ROBOTWIN_PYTHON=/path/to/conda-envs/RoboTwin/bin/python
+
+bash scripts/verify_full30k_rtc_environment.sh \
+  --gpu-ids 1,2,3,5 \
+  --base-port 9380 \
+  --min-free-mib 55000
+```
+
+`55000 MiB`是FP32复现的保守启动门槛，不是模型理论最低显存。应根据权威服务器实际峰值更新；不得继续使用BF16时期的`21000 MiB`门槛。

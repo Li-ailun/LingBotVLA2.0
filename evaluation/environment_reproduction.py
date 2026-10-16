@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import os
 from pathlib import Path
 import re
@@ -134,6 +135,78 @@ def _plan_create_command(args: argparse.Namespace) -> int:
     return 0
 
 
+def _asset_base(root: Path, asset: dict) -> Path:
+    options = asset.get("path_options") or [asset["path"]]
+    candidates = [root / option for option in options]
+    for candidate in candidates:
+        if candidate.exists():
+            return candidate
+    return candidates[0]
+
+
+def validate_assets(root: Path, manifest: dict) -> list[str]:
+    root = Path(root).resolve()
+    errors: list[str] = []
+    for asset in manifest.get("assets", []):
+        asset_id = asset.get("id", "unknown")
+        base = _asset_base(root, asset)
+        if not base.exists():
+            errors.append(f"{asset_id}: missing path: {base}")
+            continue
+        for relative in asset.get("required", []):
+            required = base / relative
+            if not required.exists():
+                errors.append(f"{asset_id}: missing required file: {required}")
+        if asset.get("type") == "hf_indexed_checkpoint":
+            incomplete = sorted(base.glob("*.incomplete"))
+            if incomplete:
+                errors.append(f"{asset_id}: incomplete download: {incomplete[0]}")
+            index_path = base / "model.safetensors.index.json"
+            if index_path.is_file():
+                try:
+                    index = json.loads(index_path.read_text(encoding="utf-8"))
+                    shards = sorted(set(index["weight_map"].values()))
+                except (OSError, KeyError, TypeError, json.JSONDecodeError) as exc:
+                    errors.append(f"{asset_id}: invalid weight index {index_path}: {exc}")
+                else:
+                    for shard in shards:
+                        if not (base / shard).is_file():
+                            errors.append(f"{asset_id}: indexed shard missing: {base / shard}")
+    return errors
+
+
+def build_runtime_plan(gpu_ids: str, base_port: int, min_free_mib: int) -> dict:
+    parts = gpu_ids.split(",")
+    if not parts or any(not re.fullmatch(r"\d+", part) for part in parts):
+        raise ValueError("--gpu-ids must be a comma-separated list of non-negative integers")
+    ids = [int(part) for part in parts]
+    if len(ids) != len(set(ids)):
+        raise ValueError("--gpu-ids contains duplicates")
+    if not 1 <= base_port <= 65535 or base_port + len(ids) - 1 > 65535:
+        raise ValueError("requested inference port range is invalid")
+    if min_free_mib <= 0:
+        raise ValueError("--min-free-mib must be positive")
+    return {
+        "gpu_ids": ids,
+        "ports": list(range(base_port, base_port + len(ids))),
+        "min_free_mib": int(min_free_mib),
+    }
+
+
+def _validate_assets_command(args: argparse.Namespace) -> int:
+    manifest = json.loads(args.manifest.read_text(encoding="utf-8"))
+    errors = validate_assets(args.root, manifest)
+    if errors:
+        raise ValueError("asset validation failed:\n  " + "\n  ".join(errors))
+    print("FULL30K ASSETS VALID")
+    return 0
+
+
+def _runtime_plan_command(args: argparse.Namespace) -> int:
+    print(json.dumps(build_runtime_plan(args.gpu_ids, args.base_port, args.min_free_mib)))
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest="command", required=True)
@@ -150,6 +223,15 @@ def build_parser() -> argparse.ArgumentParser:
     plan.add_argument("--robotwin-prefix", type=Path, required=True)
     plan.add_argument("--update", action="store_true")
     plan.set_defaults(handler=_plan_create_command)
+    assets = commands.add_parser("validate-assets")
+    assets.add_argument("--root", type=Path, required=True)
+    assets.add_argument("--manifest", type=Path, required=True)
+    assets.set_defaults(handler=_validate_assets_command)
+    runtime = commands.add_parser("runtime-plan")
+    runtime.add_argument("--gpu-ids", required=True)
+    runtime.add_argument("--base-port", type=int, required=True)
+    runtime.add_argument("--min-free-mib", type=int, required=True)
+    runtime.set_defaults(handler=_runtime_plan_command)
     return parser
 
 

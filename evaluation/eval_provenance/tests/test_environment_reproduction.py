@@ -11,6 +11,7 @@ import pytest
 ROOT = Path(__file__).resolve().parents[3]
 MODULE = ROOT / "evaluation/environment_reproduction.py"
 EXPORTER = ROOT / "scripts/export_verified_environments.sh"
+ASSET_MANIFEST = ROOT / "environment/assets-full30k.json"
 
 
 def _load():
@@ -201,3 +202,69 @@ def test_create_script_dry_run_does_not_create_environments(tmp_path: Path) -> N
     assert result.returncode == 0, result.stderr
     assert "env create" in result.stdout
     assert not envs.exists()
+
+
+def test_full30k_asset_manifest_lists_every_runtime_input() -> None:
+    import json
+
+    manifest = json.loads(ASSET_MANIFEST.read_text(encoding="utf-8"))
+    ids = {asset["id"] for asset in manifest["assets"]}
+    assert {
+        "qwen3_vl_4b", "full30k_checkpoint", "full5k_runtime_config",
+        "moge_depth", "lingbot_depth", "dino_video",
+        "robotwin_objects", "robotwin_embodiments",
+        "robotwin_background_texture", "curobo_source",
+    } <= ids
+    assert manifest["canonical_evaluation"]["precision"] == "fp32"
+    assert manifest["canonical_evaluation"]["instruction_type"] == "unseen"
+    assert manifest["canonical_evaluation"]["ema_alpha"] == 0.10
+
+
+def test_validate_assets_checks_indexed_shards_and_incomplete_files(
+    tmp_path: Path,
+) -> None:
+    import json
+
+    module = _load()
+    checkpoint = tmp_path / "models/lingbot_30K"
+    checkpoint.mkdir(parents=True)
+    (checkpoint / "config.json").write_text("{}")
+    (checkpoint / "model.safetensors.index.json").write_text(
+        json.dumps({"weight_map": {"a": "one.safetensors", "b": "two.safetensors"}})
+    )
+    (checkpoint / "one.safetensors").write_bytes(b"one")
+    (checkpoint / "two.safetensors").write_bytes(b"two")
+    manifest = {
+        "assets": [{
+            "id": "full30k_checkpoint",
+            "type": "hf_indexed_checkpoint",
+            "path": "models/lingbot_30K",
+            "required": ["config.json", "model.safetensors.index.json"],
+        }]
+    }
+
+    assert module.validate_assets(tmp_path, manifest) == []
+    (checkpoint / "two.safetensors").unlink()
+    assert any("two.safetensors" in item for item in module.validate_assets(tmp_path, manifest))
+    (checkpoint / "two.safetensors").write_bytes(b"two")
+    (checkpoint / "model-00003.incomplete").touch()
+    assert any("incomplete" in item.lower() for item in module.validate_assets(tmp_path, manifest))
+
+
+@pytest.mark.parametrize("value", ["", "1,1", "1,-2", "1,a", "1,,3"])
+def test_runtime_plan_rejects_invalid_or_duplicate_gpu_ids(value: str) -> None:
+    module = _load()
+    with pytest.raises(ValueError):
+        module.build_runtime_plan(value, 9380, 55000)
+
+
+def test_runtime_plan_preserves_noncontiguous_gpu_ids_and_port_range() -> None:
+    module = _load()
+
+    plan = module.build_runtime_plan("1,2,5,8", 9380, 55000)
+
+    assert plan == {
+        "gpu_ids": [1, 2, 5, 8],
+        "ports": [9380, 9381, 9382, 9383],
+        "min_free_mib": 55000,
+    }

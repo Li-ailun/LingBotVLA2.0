@@ -1,0 +1,95 @@
+{
+  "schema_version": 1,
+  "canonical_evaluation": {
+    "model": "full30k",
+    "precision": "fp32",
+    "mode": "rtc",
+    "setting": "demo_clean",
+    "instruction_type": "unseen",
+    "episodes_per_task": 50,
+    "request_index": 20,
+    "fixed_delay_steps": 10,
+    "execution_horizon": 20,
+    "crossfade_steps": 10,
+    "ema_alpha": 0.1
+  },
+  "assets": [
+    {
+      "id": "qwen3_vl_4b",
+      "type": "directory",
+      "path": "models/Qwen3-VL-4B-Instruct",
+      "source": "https://huggingface.co/Qwen/Qwen3-VL-4B-Instruct",
+      "required": ["config.json"]
+    },
+    {
+      "id": "full30k_checkpoint",
+      "type": "hf_indexed_checkpoint",
+      "path_options": [
+        "models/lingbot_30K",
+        "models/lingbot_30K/checkpoints/global_step_30000/hf_ckpt"
+      ],
+      "source": "provided_by_maintainer",
+      "required": ["config.json", "model.safetensors.index.json"]
+    },
+    {
+      "id": "full5k_runtime_config",
+      "type": "directory",
+      "path": "models/lingbot_full_5k_6_60",
+      "source": "provided_by_maintainer",
+      "required": [
+        "lingbotvla_cli.yaml",
+        "assets/norm_stats/robotwin_clean.json",
+        "configs/robot_configs_clean/robotwin.yaml"
+      ]
+    },
+    {
+      "id": "moge_depth",
+      "type": "directory",
+      "path": "models/depth/moge-2-vitb-normal",
+      "source": "provided_by_maintainer",
+      "required": ["model.pt"]
+    },
+    {
+      "id": "lingbot_depth",
+      "type": "directory",
+      "path": "models/lingbot-vla-v2-6b/depth",
+      "source": "provided_by_maintainer",
+      "required": ["model.pt"]
+    },
+    {
+      "id": "dino_video",
+      "type": "directory",
+      "path": "models/lingbot-vla-v2-6b/dino_video",
+      "source": "provided_by_maintainer",
+      "required": ["teacher_step_10000.pth", "config.yaml"]
+    },
+    {
+      "id": "robotwin_objects",
+      "type": "directory",
+      "path": "RoboTwin_lingbot/assets/objects",
+      "source": "https://huggingface.co/datasets/TianxingChen/RoboTwin2.0",
+      "required": ["objaverse/list.json"]
+    },
+    {
+      "id": "robotwin_embodiments",
+      "type": "directory",
+      "path": "RoboTwin_lingbot/assets/embodiments",
+      "source": "https://huggingface.co/datasets/TianxingChen/RoboTwin2.0",
+      "required": ["aloha-agilex"]
+    },
+    {
+      "id": "robotwin_background_texture",
+      "type": "directory",
+      "path": "RoboTwin_lingbot/assets/background_texture",
+      "source": "https://huggingface.co/datasets/TianxingChen/RoboTwin2.0",
+      "required": []
+    },
+    {
+      "id": "curobo_source",
+      "type": "directory",
+      "path": "RoboTwin_lingbot/envs/curobo",
+      "source": "https://github.com/NVlabs/curobo.git@d64c4b005459db10c5dd867d8b30a87d5bda9bdb",
+      "required": ["pyproject.toml"]
+    }
+  ]
+}
