@@ -29,7 +29,7 @@ export_one() {
   local raw="$stage/$name.raw.yml"
   "$CONDA_BIN" env export --prefix "$prefix" --no-builds > "$raw"
   "$CONDA_BIN" list --prefix "$prefix" --explicit > "$stage/snapshots/$name.conda-explicit.txt"
-  "$prefix/bin/python" -m pip freeze --exclude-editable > "$stage/snapshots/$name.pip-freeze.txt"
+  "$prefix/bin/python" -m pip list --format=freeze --exclude-editable > "$stage/snapshots/$name.pip-freeze.txt"
   "$prefix/bin/python" "$ROOT/evaluation/environment_reproduction.py" sanitize-conda \
     --input "$raw" --output "$stage/$name.environment.yml" --name "$name" \
     --drop-editable

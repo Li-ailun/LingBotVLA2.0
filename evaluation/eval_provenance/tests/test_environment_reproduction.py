@@ -136,7 +136,8 @@ def test_exporter_uses_verified_server_prefix_defaults() -> None:
     assert "/home/hddData/User/lixiang/conda-envs/RoboTwin" in text
     assert "mktemp" in text
     assert "--drop-editable" in text
-    assert "pip freeze --exclude-editable" in text
+    assert "pip list --format=freeze --exclude-editable" in text
+    assert "pip freeze" not in text
     assert "check-portable" in text
     assert "--output /dev/null" not in text
 
