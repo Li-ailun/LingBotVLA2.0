@@ -112,3 +112,92 @@ def test_exporter_uses_verified_server_prefix_defaults() -> None:
     assert "/home/hddData/User/lixiang/conda-envs/lingbotvla" in text
     assert "/home/hddData/User/lixiang/conda-envs/RoboTwin" in text
     assert "mktemp" in text
+
+
+def test_create_plan_requires_both_exported_environment_files(tmp_path: Path) -> None:
+    module = _load()
+
+    with pytest.raises(FileNotFoundError, match="lingbotvla.environment.yml"):
+        module.build_create_plan(
+            root=ROOT,
+            conda_exe=Path("/opt/conda/bin/conda"),
+            environment_dir=tmp_path,
+            lingbot_prefix=tmp_path / "envs/lingbotvla",
+            robotwin_prefix=tmp_path / "envs/RoboTwin",
+            update=False,
+        )
+
+
+def test_create_plan_refuses_existing_environment_without_update(
+    tmp_path: Path,
+) -> None:
+    module = _load()
+    (tmp_path / "lingbotvla.environment.yml").write_text("name: lingbotvla\n")
+    (tmp_path / "RoboTwin.environment.yml").write_text("name: RoboTwin\n")
+    prefix = tmp_path / "envs/lingbotvla"
+    (prefix / "bin").mkdir(parents=True)
+    (prefix / "bin/python").touch()
+
+    with pytest.raises(FileExistsError, match="--update"):
+        module.build_create_plan(
+            root=ROOT,
+            conda_exe=Path("/opt/conda/bin/conda"),
+            environment_dir=tmp_path,
+            lingbot_prefix=prefix,
+            robotwin_prefix=tmp_path / "envs/RoboTwin",
+            update=False,
+        )
+
+
+def test_create_plan_uses_current_checkout_and_deterministic_names(
+    tmp_path: Path,
+) -> None:
+    module = _load()
+    (tmp_path / "lingbotvla.environment.yml").write_text("name: lingbotvla\n")
+    (tmp_path / "RoboTwin.environment.yml").write_text("name: RoboTwin\n")
+    lingbot_prefix = tmp_path / "envs/lingbotvla"
+    robotwin_prefix = tmp_path / "envs/RoboTwin"
+
+    commands = module.build_create_plan(
+        root=ROOT,
+        conda_exe=Path("/opt/conda/bin/conda"),
+        environment_dir=tmp_path,
+        lingbot_prefix=lingbot_prefix,
+        robotwin_prefix=robotwin_prefix,
+        update=False,
+    )
+
+    assert commands[0][:4] == [
+        "/opt/conda/bin/conda", "env", "create", "--prefix"
+    ]
+    assert commands[1][:4] == [
+        "/opt/conda/bin/conda", "env", "create", "--prefix"
+    ]
+    assert [str(ROOT / "lingbot-vla-v2")] in [command[-1:] for command in commands]
+    curobo = str(ROOT / "RoboTwin_lingbot/envs/curobo")
+    assert any(curobo in command for command in commands)
+
+
+def test_create_script_dry_run_does_not_create_environments(tmp_path: Path) -> None:
+    env_dir = tmp_path / "definitions"
+    env_dir.mkdir()
+    (env_dir / "lingbotvla.environment.yml").write_text("name: lingbotvla\n")
+    (env_dir / "RoboTwin.environment.yml").write_text("name: RoboTwin\n")
+    envs = tmp_path / "envs"
+    script = ROOT / "scripts/create_eval_environments.sh"
+
+    result = subprocess.run(
+        [
+            "bash", str(script), "--dry-run", "--conda", "/bin/true",
+            "--environment-dir", str(env_dir),
+            "--lingbot-prefix", str(envs / "lingbotvla"),
+            "--robotwin-prefix", str(envs / "RoboTwin"),
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert "env create" in result.stdout
+    assert not envs.exists()

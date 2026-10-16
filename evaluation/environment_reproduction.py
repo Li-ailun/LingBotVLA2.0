@@ -7,6 +7,7 @@ import argparse
 import os
 from pathlib import Path
 import re
+import shlex
 import sys
 import tempfile
 
@@ -68,6 +69,71 @@ def _sanitize_conda_command(args: argparse.Namespace) -> int:
     return 0
 
 
+def build_create_plan(
+    *,
+    root: Path,
+    conda_exe: Path,
+    environment_dir: Path,
+    lingbot_prefix: Path,
+    robotwin_prefix: Path,
+    update: bool,
+) -> list[list[str]]:
+    root = root.resolve()
+    environment_dir = environment_dir.resolve()
+    definitions = (
+        ("lingbotvla", environment_dir / "lingbotvla.environment.yml", lingbot_prefix),
+        ("RoboTwin", environment_dir / "RoboTwin.environment.yml", robotwin_prefix),
+    )
+    commands: list[list[str]] = []
+    for name, definition, prefix in definitions:
+        if not definition.is_file():
+            raise FileNotFoundError(
+                f"missing verified environment definition: {definition}; "
+                "run scripts/export_verified_environments.sh on DRLServer"
+            )
+        exists = (prefix / "bin/python").exists()
+        if exists and not update:
+            raise FileExistsError(
+                f"environment already exists: {prefix}; pass --update to modify it"
+            )
+        action = "update" if exists else "create"
+        command = [
+            str(conda_exe), "env", action, "--prefix", str(prefix),
+            "--file", str(definition),
+        ]
+        if action == "update":
+            command.append("--prune")
+        commands.append(command)
+
+    commands.extend(
+        [
+            [
+                str(lingbot_prefix / "bin/python"), "-m", "pip", "install", "-e",
+                str(root / "lingbot-vla-v2"),
+            ],
+            [
+                str(robotwin_prefix / "bin/python"), "-m", "pip", "install", "-e",
+                str(root / "RoboTwin_lingbot/envs/curobo"), "--no-build-isolation",
+            ],
+        ]
+    )
+    return commands
+
+
+def _plan_create_command(args: argparse.Namespace) -> int:
+    commands = build_create_plan(
+        root=args.root,
+        conda_exe=args.conda,
+        environment_dir=args.environment_dir,
+        lingbot_prefix=args.lingbot_prefix,
+        robotwin_prefix=args.robotwin_prefix,
+        update=args.update,
+    )
+    for command in commands:
+        print(shlex.join(command))
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest="command", required=True)
@@ -76,6 +142,14 @@ def build_parser() -> argparse.ArgumentParser:
     sanitize.add_argument("--output", type=Path, required=True)
     sanitize.add_argument("--name", required=True)
     sanitize.set_defaults(handler=_sanitize_conda_command)
+    plan = commands.add_parser("plan-create")
+    plan.add_argument("--root", type=Path, required=True)
+    plan.add_argument("--conda", type=Path, required=True)
+    plan.add_argument("--environment-dir", type=Path, required=True)
+    plan.add_argument("--lingbot-prefix", type=Path, required=True)
+    plan.add_argument("--robotwin-prefix", type=Path, required=True)
+    plan.add_argument("--update", action="store_true")
+    plan.set_defaults(handler=_plan_create_command)
     return parser
 
 
