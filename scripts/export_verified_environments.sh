@@ -28,11 +28,17 @@ export_one() {
   local name="$1" prefix="$2" raw="$stage/$name.raw.yml"
   "$CONDA_BIN" env export --prefix "$prefix" --no-builds > "$raw"
   "$CONDA_BIN" list --prefix "$prefix" --explicit > "$stage/snapshots/$name.conda-explicit.txt"
-  "$prefix/bin/python" -m pip freeze > "$stage/snapshots/$name.pip-freeze.txt"
+  "$prefix/bin/python" -m pip freeze --exclude-editable > "$stage/snapshots/$name.pip-freeze.txt"
   "$prefix/bin/python" "$ROOT/evaluation/environment_reproduction.py" sanitize-conda \
-    --input "$raw" --output "$stage/$name.environment.yml" --name "$name"
-  "$prefix/bin/python" "$ROOT/evaluation/environment_reproduction.py" sanitize-conda \
-    --input "$raw" --output /dev/null --name "$name"
+    --input "$raw" --output "$stage/$name.environment.yml" --name "$name" \
+    --drop-editable
+  for snapshot in \
+    "$stage/$name.environment.yml" \
+    "$stage/snapshots/$name.conda-explicit.txt" \
+    "$stage/snapshots/$name.pip-freeze.txt"; do
+    "$prefix/bin/python" "$ROOT/evaluation/environment_reproduction.py" \
+      check-portable --input "$snapshot"
+  done
 }
 
 export_one lingbotvla "$LINGBOTVLA_ENV_PREFIX"

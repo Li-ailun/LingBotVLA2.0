@@ -30,11 +30,19 @@ def find_nonportable_references(text: str) -> list[str]:
     return findings
 
 
-def sanitize_conda_export(text: str, name: str) -> str:
+def sanitize_conda_export(
+    text: str, name: str, *, drop_editable: bool = False
+) -> str:
     if not re.fullmatch(r"[A-Za-z0-9_.-]+", name):
         raise ValueError(f"invalid environment name: {name!r}")
     lines = text.splitlines()
-    portable = [line for line in lines if not line.startswith("prefix:")]
+    portable = []
+    for line in lines:
+        if line.startswith("prefix:"):
+            continue
+        if drop_editable and re.match(r"^\s*-\s+-e(?:\s|$)", line):
+            continue
+        portable.append(line)
     if portable and portable[0].startswith("name:"):
         portable[0] = f"name: {name}"
     else:
@@ -65,8 +73,20 @@ def _atomic_write(path: Path, content: str) -> None:
 
 def _sanitize_conda_command(args: argparse.Namespace) -> int:
     raw = args.input.read_text(encoding="utf-8")
-    result = sanitize_conda_export(raw, args.name)
+    result = sanitize_conda_export(
+        raw, args.name, drop_editable=args.drop_editable
+    )
     _atomic_write(args.output, result)
+    return 0
+
+
+def _check_portable_command(args: argparse.Namespace) -> int:
+    findings = find_nonportable_references(args.input.read_text(encoding="utf-8"))
+    if findings:
+        raise ValueError(
+            "non-portable references found:\n  " + "\n  ".join(findings)
+        )
+    print(f"PORTABLE: {args.input}")
     return 0
 
 
@@ -214,7 +234,11 @@ def build_parser() -> argparse.ArgumentParser:
     sanitize.add_argument("--input", type=Path, required=True)
     sanitize.add_argument("--output", type=Path, required=True)
     sanitize.add_argument("--name", required=True)
+    sanitize.add_argument("--drop-editable", action="store_true")
     sanitize.set_defaults(handler=_sanitize_conda_command)
+    portable = commands.add_parser("check-portable")
+    portable.add_argument("--input", type=Path, required=True)
+    portable.set_defaults(handler=_check_portable_command)
     plan = commands.add_parser("plan-create")
     plan.add_argument("--root", type=Path, required=True)
     plan.add_argument("--conda", type=Path, required=True)

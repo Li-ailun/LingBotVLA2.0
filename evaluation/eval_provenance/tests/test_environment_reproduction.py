@@ -62,6 +62,27 @@ def test_sanitize_conda_export_rejects_nonportable_dependencies(
         module.sanitize_conda_export(raw, "lingbotvla")
 
 
+def test_sanitize_conda_export_can_drop_editable_checkout_dependencies() -> None:
+    module = _load()
+    raw = """name: old
+dependencies:
+  - python=3.10
+  - pip:
+      - -e /home/hddData/User/lixiang/LingBotVLA2.0_new/lingbot-vla-v2
+      - websockets==15.0.1
+prefix: /home/hddData/User/lixiang/conda-envs/lingbotvla
+"""
+
+    result = module.sanitize_conda_export(
+        raw, "lingbotvla", drop_editable=True
+    )
+
+    assert "-e " not in result
+    assert "lingbot-vla-v2" not in result
+    assert "websockets==15.0.1" in result
+    assert "prefix:" not in result
+
+
 def test_find_nonportable_references_reports_each_unique_reference() -> None:
     module = _load()
     text = """a=file:///tmp/a
@@ -114,6 +135,29 @@ def test_exporter_uses_verified_server_prefix_defaults() -> None:
     assert "/home/hddData/User/lixiang/conda-envs/lingbotvla" in text
     assert "/home/hddData/User/lixiang/conda-envs/RoboTwin" in text
     assert "mktemp" in text
+    assert "--drop-editable" in text
+    assert "pip freeze --exclude-editable" in text
+    assert "check-portable" in text
+    assert "--output /dev/null" not in text
+
+
+def test_check_portable_cli_rejects_absolute_checkout_reference(
+    tmp_path: Path,
+) -> None:
+    snapshot = tmp_path / "freeze.txt"
+    snapshot.write_text(
+        "pkg @ file:///home/lixiang/PROJECT/pkg\n", encoding="utf-8"
+    )
+
+    result = subprocess.run(
+        [sys.executable, str(MODULE), "check-portable", "--input", str(snapshot)],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode != 0
+    assert "non-portable" in result.stderr
 
 
 def test_create_plan_requires_both_exported_environment_files(tmp_path: Path) -> None:
