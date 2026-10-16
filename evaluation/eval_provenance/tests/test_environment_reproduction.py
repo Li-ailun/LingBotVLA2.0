@@ -12,6 +12,7 @@ ROOT = Path(__file__).resolve().parents[3]
 MODULE = ROOT / "evaluation/environment_reproduction.py"
 EXPORTER = ROOT / "scripts/export_verified_environments.sh"
 ASSET_MANIFEST = ROOT / "environment/assets-full30k.json"
+CANONICAL_RUNNER = ROOT / "scripts/run_full30k_rtc_clean_unseen.sh"
 
 
 def _load():
@@ -268,3 +269,32 @@ def test_runtime_plan_preserves_noncontiguous_gpu_ids_and_port_range() -> None:
         "ports": [9380, 9381, 9382, 9383],
         "min_free_mib": 55000,
     }
+
+
+def test_canonical_runner_dry_run_has_full_fp32_rtc_contract() -> None:
+    result = subprocess.run(
+        [
+            "bash", str(CANONICAL_RUNNER),
+            "--gpu-ids", "1,2,3,5",
+            "--base-port", "9380",
+            "--episodes", "50",
+            "--min-free-mib", "55000",
+            "--dry-run",
+        ],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    output = result.stdout
+    for expected in (
+        "--setting demo_clean", "--model full30k", "--precision fp32",
+        "--episodes 50", "--gpu-ids 1,2,3,5", "--base-port 9380",
+        "--instruction-type unseen", "--request-index 20",
+        "--fixed-delay-steps 10", "--execution-horizon 20",
+        "--crossfade-steps 10", "--ema-alpha 0.10",
+    ):
+        assert expected in output
+    assert "/home/hddData" not in output

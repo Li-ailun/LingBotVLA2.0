@@ -36,3 +36,12 @@ bash scripts/verify_full30k_rtc_environment.sh \
 ```
 
 `55000 MiB`是FP32复现的保守启动门槛，不是模型理论最低显存。应根据权威服务器实际峰值更新；不得继续使用BF16时期的`21000 MiB`门槛。
+
+标准评测入口：
+
+```bash
+bash scripts/run_full30k_rtc_clean_unseen.sh \
+  --gpu-ids 1,2,3,5 --base-port 9380 --episodes 50
+```
+
+该入口固定`full30k + fp32 + RTC + demo_clean + unseen + 20/10/20/10/0.10`，只允许复现者选择GPU、端口、episode数量和环境位置。

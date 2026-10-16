@@ -1,10 +1,10 @@
 # LingBotVLA2.0 服务器评测完整复现手册
 
-更新时间：2026-10-13。
+更新时间：2026-10-16。
 
 本文说明如何在已经具备兼容 NVIDIA 驱动、CUDA 和 Conda 的服务器上，从Git仓库和本地大型资产复现 LingBotVLA2.0 的 RoboTwin 单GPU非RTC、RTC、断点续评、逐episode记录和录像功能。
 
-本文只覆盖评测，不覆盖训练和实机数据录制。当前有把握确认的是单GPU链路；任意GPU编号选择已经支持，但多GPU并发仍受SAPIEN/Vulkan多实例资源限制，不能写成已经完全验证的能力。
+本文只覆盖评测，不覆盖训练和实机数据录制。单GPU非RTC和多GPU RTC已经在现有服务器实际运行；任意GPU编号选择已经支持。每台新服务器仍必须先用单任务验证SAPIEN/Vulkan资源，再逐步提高并发数。
 
 ## 1. 最终结论
 
@@ -355,7 +355,7 @@ test -f RoboTwin_lingbot/assets/objects/objaverse/list.json
 模型注册位于 `evaluation/model_registry.sh`，支持：
 
 ```text
---model step2000 | full5k
+--model step2000 | full5k | full15k | full30k
 --precision bf16 | fp32
 ```
 
@@ -819,7 +819,7 @@ bash myscripts/simulation_rtc_tools/scripts/preflight.sh \
   --deep
 ```
 
-本地单卡非RTC冒烟测试：
+本地单卡非RTC冒烟测试（历史BF16示例）：
 
 ```bash
 bash evaluation/lingbot_action_step2000/run_eval.sh \
@@ -832,13 +832,13 @@ bash evaluation/lingbot_action_step2000/run_eval.sh \
   --instruction-type unseen
 ```
 
-服务器任意三卡RTC全量评测示例：
+服务器任意三卡RTC全量评测示例（当前标准为FP32、Clean-unseen）：
 
 ```bash
 bash myscripts/simulation_rtc_tools/scripts/run_rtc_fast_50x50.sh \
-  --setting demo_randomized \
+  --setting demo_clean \
   --model full30k \
-  --precision bf16 \
+  --precision fp32 \
   --episodes 50 \
   --gpu-ids 1,3,4 \
   --instruction-type unseen \
@@ -846,7 +846,7 @@ bash myscripts/simulation_rtc_tools/scripts/run_rtc_fast_50x50.sh \
   --fixed-delay-steps 10 \
   --execution-horizon 20 \
   --crossfade-steps 10 \
-  --ema-alpha 0.21
+  --ema-alpha 0.10
 ```
 
 本地与服务器使用同一套代码；单卡和多卡的差异仅是`--gpu`与
@@ -864,7 +864,7 @@ RTC全量评测中断后，推荐使用`--resume-all`自动恢复整个运行目
 并为每个任务独立恢复已完成数、成功数和下一个环境seed。完成目标episode数的任务
 不会重新运行，未开始和未完成的任务按官方任务顺序进入多卡队列。
 
-示例：使用GPU 1、3、4恢复full30k RTC评测：
+示例：使用GPU 1、3、4恢复full30k FP32 RTC评测：
 
 ```bash
 cd <SERVER_ROOT>
@@ -877,9 +877,9 @@ export LINGBOTVLA_PYTHON=/path/to/conda-envs/lingbotvla/bin/python
 export RUN=/绝对路径/到/原运行目录
 
 bash myscripts/simulation_rtc_tools/scripts/run_rtc_fast_50x50.sh \
-  --setting demo_randomized \
+  --setting demo_clean \
   --model full30k \
-  --precision bf16 \
+  --precision fp32 \
   --episodes 50 \
   --gpu-ids 1,3,4 \
   --instruction-type unseen \
@@ -889,7 +889,7 @@ bash myscripts/simulation_rtc_tools/scripts/run_rtc_fast_50x50.sh \
   --fixed-delay-steps 10 \
   --execution-horizon 20 \
   --crossfade-steps 10 \
-  --ema-alpha 0.21
+  --ema-alpha 0.10
 ```
 
 启动前会把当前参数与`run_manifest.json`比较。模型、精度、RTC/non-RTC模式、
@@ -909,3 +909,93 @@ clean/randomized、seen/unseen、episode目标或RTC参数不一致时直接停�
 多个worker写入成功episode汇总时由provenance文件锁保护。任务进程异常重试前会
 重新读取该任务的最新`episodes.jsonl`，因此已经在失败前落盘的episode不会被当成
 未完成进度重新计算。
+
+## 19. full30k FP32 RTC Clean-unseen标准复现
+
+当前标准目标固定为：
+
+```text
+model=full30k
+precision=fp32
+mode=RTC
+setting=demo_clean
+instruction_type=unseen
+episodes=50/task
+request_index=20
+fixed_delay_steps=10
+execution_horizon=20
+crossfade_steps=10
+ema_alpha=0.10
+```
+
+### 19.1 环境来源与创建
+
+权威环境来自已经运行该链路的DRLServer，而不是本地工作站。先在DRLServer导出：
+
+```bash
+cd <SERVER_ROOT>
+bash scripts/export_verified_environments.sh
+```
+
+检查并提交生成的纯文本`environment/*.environment.yml`和
+`environment/snapshots/*`后，新服务器执行：
+
+```bash
+bash scripts/create_eval_environments.sh \
+  --conda /path/to/conda \
+  --lingbot-prefix /path/to/conda-envs/lingbotvla \
+  --robotwin-prefix /path/to/conda-envs/RoboTwin
+```
+
+完整外部资产清单位于`environment/assets-full30k.json`。模型和仿真资产不进入Git，
+必须放在清单规定的项目相对路径；full30k继续复用full5k的训练配置、机器人配置和
+归一化统计。
+
+### 19.2 只读预检
+
+FP32需要显著高于BF16的显存。以下`55000 MiB`是保守启动门槛，可按实测峰值调整；
+不能继续使用BF16评测时期的`21000 MiB`检查值。
+
+```bash
+cd <SERVER_ROOT>
+unset LD_LIBRARY_PATH
+export LINGBOTVLA_PYTHON=/path/to/conda-envs/lingbotvla/bin/python
+export ROBOTWIN_PYTHON=/path/to/conda-envs/RoboTwin/bin/python
+
+bash scripts/verify_full30k_rtc_environment.sh \
+  --gpu-ids 1,2,3,5 \
+  --base-port 9380 \
+  --min-free-mib 55000
+```
+
+### 19.3 正式运行
+
+先审计最终命令，不启动服务：
+
+```bash
+bash scripts/run_full30k_rtc_clean_unseen.sh \
+  --gpu-ids 1,2,3,5 \
+  --base-port 9380 \
+  --episodes 50 \
+  --min-free-mib 55000 \
+  --dry-run
+```
+
+确认输出后去掉`--dry-run`正式运行。GPU编号和端口只是示例，复现者可以选择任意
+满足显存条件且未占用的GPU和端口；模型、FP32、Clean-unseen及RTC参数由包装入口
+固定，无需修改任何项目代码。
+
+录像仍使用现有入口，并显式保持同一参数：
+
+```bash
+bash myscripts/simulation_rtc_tools/scripts/run_rtc_video_eval.sh \
+  --setting demo_clean --model full30k --precision fp32 \
+  --task click_alarmclock --episodes 1 --gpu 0 \
+  --instruction-type unseen \
+  --request-index 20 --fixed-delay-steps 10 \
+  --execution-horizon 20 --crossfade-steps 10 --ema-alpha 0.10
+```
+
+中断后的多GPU自动续跑仍使用第18节的`--resume-run-dir "$RUN" --resume-all`，但
+必须保持`--precision fp32`、`demo_clean`、`unseen`和全部RTC参数一致，否则Manifest
+一致性检查会拒绝写入原结果目录。
