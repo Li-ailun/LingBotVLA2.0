@@ -1,0 +1,38 @@
+captured_at=2026-10-16T22:20:19+08:00
+git_commit=d59d17249d81bb066afdb2678fe5f5bea1227c57
+kernel=Linux 6.8.0-138-generic x86_64 GNU/Linux
+NAME="Ubuntu"
+VERSION_ID="22.04"
+VERSION="22.04.5 LTS (Jammy Jellyfish)"
+ID=ubuntu
+0, NVIDIA GeForce RTX 3090, 24576 MiB, 580.167.08
+1, NVIDIA GeForce RTX 3090, 24576 MiB, 580.167.08
+2, NVIDIA GeForce RTX 3090, 24576 MiB, 580.167.08
+3, NVIDIA GeForce RTX 3090, 24576 MiB, 580.167.08
+4, NVIDIA GeForce RTX 3090, 24576 MiB, 580.167.08
+5, NVIDIA GeForce RTX 3090, 24576 MiB, 580.167.08
+6, NVIDIA GeForce RTX 3090, 24576 MiB, 580.167.08
+7, NVIDIA GeForce RTX 3090, 24576 MiB, 580.167.08
+8, NVIDIA GeForce RTX 3090, 24576 MiB, 580.167.08
+[lingbotvla]
+python=3.12.13
+torch=2.8.0+cu128
+torchvision=0.23.0+cu128
+transformers=4.57.3
+websockets=15.0.1
+sapien=UNAVAILABLE:ModuleNotFoundError
+mplib=UNAVAILABLE:ModuleNotFoundError
+pytorch3d=UNAVAILABLE:ModuleNotFoundError
+curobo=UNAVAILABLE:ModuleNotFoundError
+[RoboTwin]
+python=3.10.21
+torch=2.4.1+cu121
+torchvision=0.19.1+cu121
+transformers=UNAVAILABLE:ModuleNotFoundError
+websockets=15.0.1
+sapien=3.0.0b1
+mplib=0.2.1
+pytorch3d=0.7.8
+curobo=0.7.8
+torch_cuda=12.1
+cuda_available=True
