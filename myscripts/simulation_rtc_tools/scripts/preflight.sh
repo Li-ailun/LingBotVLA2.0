@@ -71,7 +71,7 @@ print(
 )
 PY
 
-PYTHONPATH="$TOOL:$ROOT" "$CONFIG_PY" -c "from pathlib import Path; from simulation_rtc.config import RTCConfig, RobotActionLayout; c=RTCConfig.from_yaml(Path('$TOOL/configs/lingbot_action_step2000_rtc_fast.yaml')); l=RobotActionLayout.from_yaml(Path('$LINGBOT_ROBOT_CONFIG')); assert (c.request_index,c.fixed_delay_steps,l.action_dim,l.gripper_indices)==(10,10,14,(6,13)); print('RTC CONFIG VALID')"
+PYTHONPATH="$TOOL:$ROOT" "$CONFIG_PY" -c "from pathlib import Path; from simulation_rtc.config import RTCConfig, RobotActionLayout; c=RTCConfig.from_yaml(Path('$TOOL/configs/lingbot_action_step2000_rtc_fast.yaml')); l=RobotActionLayout.from_yaml(Path('$LINGBOT_ROBOT_CONFIG')); assert (c.request_index,c.fixed_delay_steps,c.ema_alpha,l.action_dim,l.gripper_indices)==(10,10,0.10,14,(6,13)); print('RTC CONFIG VALID')"
 python3 -m py_compile "$TOOL"/simulation_rtc/*.py "$TOOL/server/policy_server_rtc.py" "$TOOL/copied_eval/eval_policy_client_lingbotvla_rtc.py" "$ROOT/evaluation/lingbot_action_step2000/copied_eval/eval_policy_client_lingbotvla_recording.py"
 
 printf '%s  %s\n' \

@@ -29,7 +29,7 @@ def test_batch_dry_run_defaults_to_clean_50_by_50():
     assert "LINGBOT_RTC_FIXED_DELAY_STEPS=10" in output
     assert "LINGBOT_RTC_EXECUTION_HORIZON=10" in output
     assert "LINGBOT_RTC_CROSSFADE_STEPS=4" in output
-    assert "LINGBOT_RTC_EMA_ALPHA=0.36" in output
+    assert "LINGBOT_RTC_EMA_ALPHA=0.1" in output
 
 
 def test_rtc_batch_supports_randomized_setting_and_separate_base_port():
@@ -311,7 +311,7 @@ def test_headless_rtc_video_eval_records_without_gui_or_realtime():
     assert "--num_episodes 1" in output
     assert (
         "evaluation/video_comparison/step2000/bf16/rtc/clean/"
-        "request_10-delay_10-switch_20-horizon_10-xfade_4-ema_0p36/click_alarmclock"
+        "request_10-delay_10-switch_20-horizon_10-xfade_4-ema_0p1/click_alarmclock"
     ) in output
     assert "ROBOTWIN_REALTIME_VISUALIZATION=1" not in output
 
@@ -339,7 +339,7 @@ def test_rtc_video_eval_can_replay_a_recorded_environment_seed():
     assert "--start_seed 100002" in output
     assert (
         "evaluation/video_comparison/full5k/bf16/rtc/clean/"
-        "request_10-delay_10-switch_20-horizon_10-xfade_4-ema_0p36/adjust_bottle"
+        "request_10-delay_10-switch_20-horizon_10-xfade_4-ema_0p1/adjust_bottle"
     ) in output
 
 
@@ -356,7 +356,7 @@ def test_full5k_rtc_video_path_identifies_model_precision_parameters_and_task():
     )
     assert (
         "evaluation/video_comparison/full5k/fp32/rtc/clean/"
-        "request_10-delay_10-switch_20-horizon_10-xfade_4-ema_0p36/open_microwave"
+        "request_10-delay_10-switch_20-horizon_10-xfade_4-ema_0p1/open_microwave"
     ) in output
 
 

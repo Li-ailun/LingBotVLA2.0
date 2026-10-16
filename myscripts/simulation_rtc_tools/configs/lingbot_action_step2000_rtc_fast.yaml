@@ -7,7 +7,7 @@ rtc:
   prefix_attention_schedule: exp
 smoothing:
   crossfade_steps: 4
-  ema_alpha: 0.36
+  ema_alpha: 0.10
 fallback:
   inference_not_ready: pause_simulation
   request_failure: fail_episode

@@ -12,7 +12,7 @@ TOOL = Path(__file__).resolve().parents[1]
 def test_shipped_config_has_fixed_fast_simulation_values():
     config = RTCConfig.from_yaml(TOOL / "configs/lingbot_action_step2000_rtc_fast.yaml")
     assert (config.chunk_horizon, config.request_index, config.fixed_delay_steps) == (50, 10, 10)
-    assert (config.execution_horizon, config.crossfade_steps, config.ema_alpha) == (10, 4, 0.36)
+    assert (config.execution_horizon, config.crossfade_steps, config.ema_alpha) == (10, 4, 0.10)
     assert config.request_timeout_s == 120.0
 
 
