@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Add a Git-tracked, server-derived environment capture/create/verify workflow and make full30k BF16 RTC Clean-unseen with `20/10/20/10/0.10` the documented canonical evaluation.
+**Goal:** Add a Git-tracked, server-derived environment capture/create/verify workflow and make full30k FP32 RTC Clean-unseen with `20/10/20/10/0.10` the documented canonical evaluation.
 
 **Architecture:** A small Python helper owns deterministic sanitization and manifest validation; thin shell entrypoints collect DRLServer facts, create the two Conda environments, and invoke existing runtime checks. Portable environment files are generated only from the verified DRLServer and are never fabricated from the local workstation. Large assets remain external and are described by a machine-readable manifest.
 
@@ -14,7 +14,7 @@
 
 - DRLServer's successfully exercised `lingbotvla` and `RoboTwin` prefixes are the authoritative environment source.
 - Do not commit models, simulator assets, Conda packages, credentials, caches, or machine-specific absolute paths.
-- Canonical evaluation is `full30k`, BF16, RTC, `demo_clean`, unseen, 50 tasks × 50 episodes, `20/10/20/10/0.10`.
+- Canonical evaluation is `full30k`, FP32, RTC, `demo_clean`, unseen, 50 tasks × 50 episodes, `20/10/20/10/0.10`.
 - Target servers select physical GPU IDs and base port without editing repository code.
 - Existing user-authored reproduction-guide content must be preserved while stale statements are corrected narrowly.
 - Every behavior change follows RED-GREEN TDD.
@@ -24,7 +24,7 @@
 - A Conda export containing an absolute `prefix`, `file://` dependency, or editable local path must be rejected before tracked output is replaced (Task 1 tests).
 - Export interruption must not leave partially rewritten tracked environment artifacts (Task 1 tests atomic staging).
 - Environment creation must refuse accidental overwrite and must not silently change CUDA/PyTorch builds (Task 2 dry-run tests).
-- GPU validation must inspect exactly the comma-separated IDs requested, including non-contiguous IDs, and derive the matching port range (Task 3 tests).
+- GPU validation must inspect exactly the comma-separated IDs requested, including non-contiguous IDs, enforce a configurable FP32 free-memory threshold, and derive the matching port range (Task 3 tests).
 - Asset verification must distinguish missing, incomplete, and wrong-index full30k checkpoints without hashing multi-gigabyte shards during every run (Task 3 tests).
 
 ---
@@ -179,7 +179,7 @@ Commit message: `更新RTC默认EMA参数为0.10`
 
 - [ ] **Step 1: Write failing canonical-command tests**
 
-Assert full30k, BF16, RTC, `demo_clean`, unseen, 50 episodes, selected GPU IDs, selected base port, and explicit `20/10/20/10/0.10`; assert no server absolute project path.
+Assert full30k, FP32, RTC, `demo_clean`, unseen, 50 episodes, selected GPU IDs, selected base port, and explicit `20/10/20/10/0.10`; assert no server absolute project path.
 
 - [ ] **Step 2: Run tests and verify RED**
 

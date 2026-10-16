@@ -5,7 +5,7 @@ Date: 2026-10-16
 ## Objective
 
 Make the Git repository sufficient to recreate the software environments and
-run the verified `full30k` BF16 RTC evaluation on `demo_clean` with unseen
+run the verified `full30k` FP32 RTC evaluation on `demo_clean` with unseen
 instructions, without editing repository code on the target server.
 
 Large models and simulator assets remain outside Git. The repository will
@@ -23,7 +23,7 @@ CUDA runtimes, important simulator package versions, and Git commit.
 
 This is a record of the verified environment, not a promise of compatibility
 with every Linux distribution, CUDA toolkit, GPU architecture, or ARM system.
-The supported baseline is Linux x86_64 with NVIDIA GPUs, Conda, BF16 inference,
+The supported baseline is Linux x86_64 with NVIDIA GPUs, Conda, FP32 inference,
 and a working SAPIEN/Vulkan rendering stack.
 
 ## Canonical Evaluation Contract
@@ -32,7 +32,7 @@ The reproduction target is:
 
 ```text
 model: full30k
-precision: bf16
+precision: fp32
 mode: RTC
 setting: demo_clean
 instruction_type: unseen
@@ -177,7 +177,7 @@ weights, assets, and evaluation source. It validates:
 
 - required interpreter paths and environment names;
 - absence of a known-incompatible CUDA path in `LD_LIBRARY_PATH`;
-- Python, PyTorch, CUDA availability, and BF16-capable GPU access;
+- Python, PyTorch, CUDA availability, and sufficient FP32 GPU memory;
 - imports for SAPIEN, mplib, PyTorch3D, and CuRobo;
 - CuRobo resolving to the current repository checkout;
 - full30k index validity, all six referenced shards, and absence of incomplete
@@ -256,7 +256,7 @@ The work is complete when a new Linux x86_64 NVIDIA server can:
 4. install the repository-local packages without editing source code;
 5. pass full30k deep preflight and the one-episode RTC smoke test;
 6. select arbitrary available GPU IDs and a free port range;
-7. launch full30k BF16 RTC `demo_clean` unseen evaluation with
+7. launch full30k FP32 RTC `demo_clean` unseen evaluation with
    `20/10/20/10/0.10`;
 8. produce provenance, per-episode records, inference logs, evaluation logs,
    RTC traces, and resumable run state.
