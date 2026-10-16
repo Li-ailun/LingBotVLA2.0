@@ -46,21 +46,21 @@
       "id": "moge_depth",
       "type": "directory",
       "path": "models/depth/moge-2-vitb-normal",
-      "source": "provided_by_maintainer",
+      "source": "https://huggingface.co/Ruicheng/moge-2-vitb-normal",
       "required": ["model.pt"]
     },
     {
       "id": "lingbot_depth",
       "type": "directory",
       "path": "models/lingbot-vla-v2-6b/depth",
-      "source": "provided_by_maintainer",
+      "source": "https://huggingface.co/robbyant/lingbot-vla-v2-6b",
       "required": ["model.pt"]
     },
     {
       "id": "dino_video",
       "type": "directory",
       "path": "models/lingbot-vla-v2-6b/dino_video",
-      "source": "provided_by_maintainer",
+      "source": "https://huggingface.co/robbyant/lingbot-vla-v2-6b",
       "required": ["teacher_step_10000.pth", "config.yaml"]
     },
     {

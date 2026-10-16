@@ -24,6 +24,19 @@ bash scripts/create_eval_environments.sh \
 
 大型文件按`assets-full30k.json`放入相对路径后，执行只读验证：
 
+公开官方来源包括：
+
+```text
+Qwen3-VL:       Qwen/Qwen3-VL-4B-Instruct
+MoGe:           Ruicheng/moge-2-vitb-normal
+Depth/DINO:     robbyant/lingbot-vla-v2-6b
+RoboTwin assets:TianxingChen/RoboTwin2.0（dataset）
+CuRobo:         https://github.com/NVlabs/curobo.git（固定commit见资产清单）
+```
+
+可复制的`hf download`和解压命令见`docs/SERVER_REPRODUCTION_GUIDE.md`第4节。
+`full30k`权重以及它复用的full5k运行配置由权重提供者另行提供。
+
 ```bash
 unset LD_LIBRARY_PATH
 export LINGBOTVLA_PYTHON=/path/to/conda-envs/lingbotvla/bin/python

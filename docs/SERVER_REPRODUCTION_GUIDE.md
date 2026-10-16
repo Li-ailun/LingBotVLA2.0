@@ -65,6 +65,8 @@ Conda环境、CUDA和NVIDIA驱动
 
 ### 3.1 Qwen3-VL基础模型（约8.3 GB）
 
+官方来源：`https://huggingface.co/Qwen/Qwen3-VL-4B-Instruct`。
+
 ```text
 本地：/home/lixiang/PROJECT/LingBotVLA2.0/models/Qwen3-VL-4B-Instruct
 目标：<SERVER_ROOT>/models/Qwen3-VL-4B-Instruct
@@ -114,6 +116,16 @@ full5k训练配置启用了深度、未来深度和未来视频相关配置。�
 ```
 
 不需要为了评测复制完整的27 GB `models/lingbot-vla-v2-6b/`。
+
+这些辅助模型均有公开官方来源：
+
+```text
+MoGe-2-vitb-normal:
+https://huggingface.co/Ruicheng/moge-2-vitb-normal
+
+LingBot-Depth与DINO-VIDEO:
+https://huggingface.co/robbyant/lingbot-vla-v2-6b
+```
 
 ### 3.4 RoboTwin资产（约16.3 GB）
 
@@ -178,7 +190,64 @@ CuRobo         0.24 GB
 合计约        51.9 GB
 ```
 
-## 4. 推荐传输命令
+## 4. 官方公开资产下载
+
+除参赛者自行训练或另行取得的`full30k`权重及其配套full5k运行配置外，其余基础模型、
+辅助模型、RoboTwin资产和CuRobo均可从官方公开仓库下载。安装Hugging Face命令行：
+
+```bash
+python3 -m pip install --upgrade huggingface_hub
+hf --help
+```
+
+在项目根目录下载Qwen、MoGe以及LingBot辅助模型：
+
+```bash
+cd <SERVER_ROOT>
+
+hf download Qwen/Qwen3-VL-4B-Instruct \
+  --local-dir models/Qwen3-VL-4B-Instruct
+
+hf download Ruicheng/moge-2-vitb-normal model.pt \
+  --local-dir models/depth/moge-2-vitb-normal
+
+hf download robbyant/lingbot-vla-v2-6b \
+  depth/model.pt \
+  dino_video/teacher_step_10000.pth \
+  dino_video/config.yaml \
+  --local-dir models/lingbot-vla-v2-6b
+```
+
+只下载RoboTwin运行所需的三个官方资产压缩包并解压：
+
+```bash
+cd <SERVER_ROOT>/RoboTwin_lingbot/assets
+
+hf download TianxingChen/RoboTwin2.0 \
+  background_texture.zip embodiments.zip objects.zip \
+  --repo-type dataset \
+  --local-dir .
+
+unzip -q background_texture.zip
+unzip -q embodiments.zip
+unzip -q objects.zip
+```
+
+CuRobo必须使用本项目固定的commit，不能直接使用当前main：
+
+```bash
+cd <SERVER_ROOT>
+mkdir -p RoboTwin_lingbot/envs
+git clone https://github.com/NVlabs/curobo.git \
+  RoboTwin_lingbot/envs/curobo
+git -C RoboTwin_lingbot/envs/curobo checkout --detach \
+  d64c4b005459db10c5dd867d8b30a87d5bda9bdb
+```
+
+下载完成后不要凭目录大小判断完整性，统一运行第20.2节的验证脚本。
+Codex可以代为执行这些命令，但必须保留仓库ID、相对目标路径与CuRobo固定commit。
+
+## 5. 已有机器之间的推荐传输命令
 
 在本机项目根目录执行，并替换服务器信息：
 
@@ -228,7 +297,7 @@ bash evaluation/prepare_runtime.sh \
 
 该路径必须直接包含 `objects/`、`embodiments/` 和 `background_texture/`。
 
-## 5. Conda与系统环境
+## 6. Conda与系统环境
 
 只需要两个Conda环境：
 
@@ -307,7 +376,7 @@ Curobo yml paths stale -> regenerating for <SERVER_ROOT>/RoboTwin_lingbot
 
 这是将CuRobo模板中的`${ASSETS_PATH}`展开为当前服务器路径，属于正常的部署路径适配。
 
-## 6. 首次部署与预检
+## 7. 首次部署与预检
 
 ```bash
 cd <SERVER_ROOT>
@@ -334,7 +403,7 @@ RTC CONFIG VALID
 RTC PREFLIGHT OK
 ```
 
-预检成功只说明静态文件、依赖导入和RTC配置满足启动条件；它不会执行仿真episode。完成预检后仍需运行第15节的非RTC和RTC单任务冒烟测试。
+预检成功只说明静态文件、依赖导入和RTC配置满足启动条件；它不会执行仿真episode。完成预检后仍需运行第16节的非RTC和RTC单任务冒烟测试。
 
 关键文件检查：
 
@@ -350,7 +419,7 @@ test -f models/lingbot-vla-v2-6b/dino_video/teacher_step_10000.pth
 test -f RoboTwin_lingbot/assets/objects/objaverse/list.json
 ```
 
-## 7. 模型、精度与GPU
+## 8. 模型、精度与GPU
 
 模型注册位于 `evaluation/model_registry.sh`，支持：
 
@@ -375,7 +444,7 @@ BF16只改变加载和推理精度，不修改磁盘FP32权重。full5k FP32通�
 
 GPU列表调度已实现，但多路SAPIEN仿真并发仍需在目标服务器验证渲染资源稳定性。
 
-## 8. 非RTC评测
+## 9. 非RTC评测
 
 单任务冒烟测试：
 
@@ -403,7 +472,7 @@ bash evaluation/lingbot_action_step2000/run_eval.sh \
 
 指定GPU只需在命令末尾追加 `--gpu 8`。
 
-### 8.1 比赛语言指令设置
+### 9.1 比赛语言指令设置
 
 赛事评测入口默认对 `demo_clean` 和 `demo_randomized` 都使用
 `instruction_type=unseen`。`seen/unseen` 只选择发送给模型的语言描述集合，
@@ -415,7 +484,7 @@ bash evaluation/lingbot_action_step2000/run_eval.sh \
 天池正式统计要求每个任务100次；本文中的50次命令用于阶段性评测，正式提交时将
 `--episodes 50` 改为 `--episodes 100`。
 
-## 9. RTC评测
+## 10. RTC评测
 
 当前full5k正式参数：
 
@@ -484,7 +553,7 @@ bash myscripts/simulation_rtc_tools/scripts/run_rtc_fast_50x50.sh \
 `myscripts/simulation_rtc_tools/results/full5k/bf16/randomized/<run>/`。
 GPU显存是否足够仍应以启动前的 `nvidia-smi` 为准，不能仅根据利用率选择GPU。
 
-## 10. 断点续评
+## 11. 断点续评
 
 每个Run目录中的 `eval_results/<task>/episodes.jsonl` 记录成功和失败episode。下一个seed应取最后记录的 `environment_seed + 1`，不能简单按episode数量推算，因为无效场景seed可能被跳过。
 
@@ -520,7 +589,7 @@ bash myscripts/simulation_rtc_tools/scripts/run_rtc_fast_50x50.sh \
 
 跨机器继续旧实验必须额外复制完整Run目录；只复制代码和模型无法恢复旧日志。
 
-## 11. 输出与可追溯记录
+## 12. 输出与可追溯记录
 
 ```text
 非RTC：evaluation/lingbot_action_step2000/results/<model>/<precision>/<setting>/<run>/
@@ -541,7 +610,7 @@ eval_results/<task>/rtc_trace.jsonl   仅RTC
 
 结果目录被Git忽略，需要自行归档。
 
-## 12. 录像入口
+## 13. 录像入口
 
 非RTC：
 
@@ -561,7 +630,7 @@ bash myscripts/simulation_rtc_tools/scripts/run_rtc_video_eval.sh \
   --execution-horizon 20 --crossfade-steps 10 --ema-alpha 0.21
 ```
 
-## 13. 常见故障
+## 14. 常见故障
 
 ### `No module named evaluation`
 
@@ -617,7 +686,7 @@ ps -ef | grep -E 'policy_server|start_robotwin' | grep -v grep
 tail -n 200 <RUN>/inference_logs/*.log
 ```
 
-## 14. 不需要迁移的内容
+## 15. 不需要迁移的内容
 
 全新评测不需要：
 
@@ -635,7 +704,7 @@ __pycache__/
 
 只有断点续跑旧实验时，才复制对应的完整Run目录。
 
-## 15. 最短复现流程
+## 16. 最短复现流程
 
 ```bash
 # 1. 克隆代码
@@ -689,7 +758,7 @@ Cleanup done
 
 两个冒烟测试都完成episode并生成 `run_manifest.json`、`episodes.jsonl` 和任务日志后，再开始50×50全量评测。
 
-## 16. 复现边界
+## 17. 复现边界
 
 代码、权重、配置和环境seed一致是必要条件，但单独重放某个环境seed不保证逐动作完全一致。推理模型随机数从服务初始seed 42开始连续推进；任务顺序、断点位置、服务数量及先前推理调用次数都会改变后续随机状态。
 
@@ -785,7 +854,7 @@ bash evaluation/lingbot_action_step2000/run_eval.sh \
 
 > 如果Conda环境和大型资产已经准备好，当前仓库可以快速、无需修改代码地复现；如果面对完全空白的新服务器，仍需安装两个Conda环境和CUDA相关编译依赖，尚未达到完全一键部署。
 
-## 17. full30k权重评测
+## 18. full30k权重评测
 
 最新继续训练权重注册名为`full30k`，并兼容`30k`和`lingbot_30K`别名。权重放在：
 
@@ -853,7 +922,7 @@ bash myscripts/simulation_rtc_tools/scripts/run_rtc_fast_50x50.sh \
 `--gpu-ids`参数。结果分别写入`results/full30k/<precision>/<setting>/`，
 不会与full5k或full15k结果混在一起。
 
-## 18. 服务器多卡自动断点续跑
+## 19. 服务器多卡自动断点续跑
 
 RTC全量评测中断后，推荐使用`--resume-all`自动恢复整个运行目录。它会读取：
 
@@ -910,7 +979,7 @@ clean/randomized、seen/unseen、episode目标或RTC参数不一致时直接停�
 重新读取该任务的最新`episodes.jsonl`，因此已经在失败前落盘的episode不会被当成
 未完成进度重新计算。
 
-## 19. full30k FP32 RTC Clean-unseen标准复现
+## 20. full30k FP32 RTC Clean-unseen标准复现
 
 当前标准目标固定为：
 
@@ -928,7 +997,7 @@ crossfade_steps=10
 ema_alpha=0.10
 ```
 
-### 19.1 环境来源与创建
+### 20.1 环境来源与创建
 
 权威环境来自已经运行该链路的DRLServer，而不是本地工作站。先在DRLServer导出：
 
@@ -951,7 +1020,7 @@ bash scripts/create_eval_environments.sh \
 必须放在清单规定的项目相对路径；full30k继续复用full5k的训练配置、机器人配置和
 归一化统计。
 
-### 19.2 只读预检
+### 20.2 只读预检
 
 FP32需要显著高于BF16的显存。以下`55000 MiB`是保守启动门槛，可按实测峰值调整；
 不能继续使用BF16评测时期的`21000 MiB`检查值。
@@ -968,7 +1037,7 @@ bash scripts/verify_full30k_rtc_environment.sh \
   --min-free-mib 55000
 ```
 
-### 19.3 正式运行
+### 20.3 正式运行
 
 先审计最终命令，不启动服务：
 
@@ -996,6 +1065,6 @@ bash myscripts/simulation_rtc_tools/scripts/run_rtc_video_eval.sh \
   --execution-horizon 20 --crossfade-steps 10 --ema-alpha 0.10
 ```
 
-中断后的多GPU自动续跑仍使用第18节的`--resume-run-dir "$RUN" --resume-all`，但
+中断后的多GPU自动续跑仍使用第19节的`--resume-run-dir "$RUN" --resume-all`，但
 必须保持`--precision fp32`、`demo_clean`、`unseen`和全部RTC参数一致，否则Manifest
 一致性检查会拒绝写入原结果目录。

@@ -272,6 +272,14 @@ def test_full30k_asset_manifest_lists_every_runtime_input() -> None:
     assert manifest["canonical_evaluation"]["instruction_type"] == "unseen"
     assert manifest["canonical_evaluation"]["ema_alpha"] == 0.10
 
+    by_id = {asset["id"]: asset for asset in manifest["assets"]}
+    assert by_id["moge_depth"]["source"] == (
+        "https://huggingface.co/Ruicheng/moge-2-vitb-normal"
+    )
+    lingbot_source = "https://huggingface.co/robbyant/lingbot-vla-v2-6b"
+    assert by_id["lingbot_depth"]["source"] == lingbot_source
+    assert by_id["dino_video"]["source"] == lingbot_source
+
 
 def test_validate_assets_checks_indexed_shards_and_incomplete_files(
     tmp_path: Path,
