@@ -79,6 +79,6 @@ printf '%s  %s\n' \
   e1acfb9f710020211a59897fbdba6fcdd8eccea1f90abe93e6dcef60f7cc4f14 "$ROOT/evaluation/lingbot_action_step2000/policy_server.py" \
   2fb48570fab1a0c5d7667215966bcd468cd24d7ad556a92303e68cc88f87ee8e "$ROOT/lingbot-vla-v2/experiment/robotwin/eval_policy_client_lingbotvla.py" | sha256sum -c -
 
-bash "$HERE/run_rtc_fast_one_task.sh" lift_pot --dry-run >/dev/null
-bash "$HERE/run_rtc_fast_50x50.sh" --dry-run >/dev/null
+bash "$HERE/run_rtc_fast_one_task.sh" lift_pot --model "$MODEL" --dry-run >/dev/null
+bash "$HERE/run_rtc_fast_50x50.sh" --model "$MODEL" --dry-run >/dev/null
 echo "RTC PREFLIGHT OK: no simulator episodes were started"

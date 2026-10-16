@@ -392,3 +392,8 @@ def test_preflight_validates_selected_model_and_runtime_assets():
     assert "MODEL ADAPTER VALID: full5k" in output
     assert "ASSET LAYOUT VALID" in output
     assert "RUNTIME IMPORTS VALID" in output
+
+
+def test_preflight_forwards_selected_model_to_both_rtc_dry_runs():
+    text = (TOOL / "scripts/preflight.sh").read_text(encoding="utf-8")
+    assert text.count('--model "$MODEL"') == 2
