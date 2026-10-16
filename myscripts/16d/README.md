@@ -64,7 +64,7 @@ source /opt/ros/humble/setup.bash
   --root "$PWD/datasets/r1pro_mcap_raw"
 ```
 
-交互依次选择操作员、任务和起始MCAP episode；快捷键为 `Space/p` 暂停，`n/b` 前后切换，`r` 重播，`1/2/3` 倍速，`d` 移出坏数据，`q` 退出。按 `d` 后会暂停并显示红色确认画面；再次按 `Enter` 才会将整个episode移入 `datasets/r1pro_mcap_raw/_deleted_episodes/`，按 `Esc` 取消。该操作不是永久删除，并在 `deletion_manifest.jsonl` 中记录原路径和恢复路径。
+交互依次选择操作员、任务和起始MCAP episode；快捷键为 `Space/p` 暂停，`n/b` 前后切换，`r` 重播，`1/2/5/0` 分别切换到 `1x/2x/5x/10x`，`d` 移出坏数据，`q` 退出。按 `d` 后会暂停并显示红色确认画面；再次按 `Enter` 才会将整个episode移入 `datasets/r1pro_mcap_raw/_deleted_episodes/`，按 `Esc` 取消。该操作不是永久删除，并在 `deletion_manifest.jsonl` 中记录原路径和恢复路径。
 
 固定录制11个话题：三路RGB图像、左右臂关节反馈、左右夹爪反馈、左右臂关节目标和左右夹爪目标。
 

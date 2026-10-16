@@ -317,7 +317,8 @@ def render_frame(
     )
     line2 = (
         f"time={elapsed:.2f}/{duration:.2f}s  rate={rate:g}x  "
-        "SPACE/p pause  n next  b previous  r replay  d remove  1/2/3 speed  q quit"
+        "SPACE/p pause  n next  b previous  r replay  d remove  "
+        "1/2/5/0=1x/2x/5x/10x  q quit"
     )
     cv2.putText(footer, line1, (10, 26), cv2.FONT_HERSHEY_SIMPLEX, 0.62, (255, 255, 255), 2, cv2.LINE_AA)
     cv2.putText(footer, line2, (10, 57), cv2.FONT_HERSHEY_SIMPLEX, 0.52, (200, 255, 200), 1, cv2.LINE_AA)
@@ -364,6 +365,15 @@ def key_action(key: int) -> str | None:
     if key == ord("r"):
         return "replay"
     return None
+
+
+def playback_rate_for_key(key: int) -> float | None:
+    return {
+        ord("1"): 1.0,
+        ord("2"): 2.0,
+        ord("5"): 5.0,
+        ord("0"): 10.0,
+    }.get(key)
 
 
 def play_episode(
@@ -424,12 +434,10 @@ def play_episode(
                 flush=True,
             )
             continue
-        if key == ord("1"):
-            rate = 0.5
-        elif key == ord("2"):
-            rate = 1.0
-        elif key == ord("3"):
-            rate = 2.0
+        selected_rate = playback_rate_for_key(key)
+        if selected_rate is not None:
+            rate = selected_rate
+            print(f"[RATE] {rate:g}x", flush=True)
 
         if not paused:
             index += 1

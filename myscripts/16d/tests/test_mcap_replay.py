@@ -75,6 +75,29 @@ def test_cli_exposes_recording_order_selection_options() -> None:
         assert option in result.stdout
 
 
+@pytest.mark.parametrize(
+    ("key", "expected_rate"),
+    [
+        (ord("1"), 1.0),
+        (ord("2"), 2.0),
+        (ord("5"), 5.0),
+        (ord("0"), 10.0),
+    ],
+)
+def test_playback_speed_shortcuts_match_displayed_rates(
+    key: int, expected_rate: float
+) -> None:
+    module = _load()
+
+    assert module.playback_rate_for_key(key) == expected_rate
+
+
+def test_unrelated_key_does_not_change_playback_speed() -> None:
+    module = _load()
+
+    assert module.playback_rate_for_key(ord("n")) is None
+
+
 def test_quarantine_episode_moves_directory_and_records_manifest(tmp_path: Path) -> None:
     module = _load()
     task_dir = (
