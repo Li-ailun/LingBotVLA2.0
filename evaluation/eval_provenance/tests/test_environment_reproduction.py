@@ -141,6 +141,13 @@ def test_exporter_uses_verified_server_prefix_defaults() -> None:
     assert "--output /dev/null" not in text
 
 
+def test_exporter_initializes_local_name_before_using_it_with_nounset() -> None:
+    text = EXPORTER.read_text(encoding="utf-8")
+
+    assert 'local name="$1" prefix="$2"\n' in text
+    assert 'local raw="$stage/$name.raw.yml"\n' in text
+
+
 def test_check_portable_cli_rejects_absolute_checkout_reference(
     tmp_path: Path,
 ) -> None:

@@ -25,7 +25,8 @@ trap 'rm -rf -- "$stage"' EXIT
 mkdir -p "$stage/snapshots"
 
 export_one() {
-  local name="$1" prefix="$2" raw="$stage/$name.raw.yml"
+  local name="$1" prefix="$2"
+  local raw="$stage/$name.raw.yml"
   "$CONDA_BIN" env export --prefix "$prefix" --no-builds > "$raw"
   "$CONDA_BIN" list --prefix "$prefix" --explicit > "$stage/snapshots/$name.conda-explicit.txt"
   "$prefix/bin/python" -m pip freeze --exclude-editable > "$stage/snapshots/$name.pip-freeze.txt"
