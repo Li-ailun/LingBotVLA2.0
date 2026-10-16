@@ -25,6 +25,11 @@ def test_batch_dry_run_defaults_to_clean_50_by_50():
     assert "--num_episodes 50" in output
     assert "demo_clean" in output
     assert "--instruction_type unseen" in output
+    assert "LINGBOT_RTC_REQUEST_INDEX=10" in output
+    assert "LINGBOT_RTC_FIXED_DELAY_STEPS=10" in output
+    assert "LINGBOT_RTC_EXECUTION_HORIZON=10" in output
+    assert "LINGBOT_RTC_CROSSFADE_STEPS=4" in output
+    assert "LINGBOT_RTC_EMA_ALPHA=0.36" in output
 
 
 def test_rtc_batch_supports_randomized_setting_and_separate_base_port():
@@ -157,6 +162,50 @@ def test_rtc_resume_can_select_physical_gpu_explicitly():
     )
     assert "--gpu_ids 8" in output
     assert "LINGBOT_GPU_IDS=8" in output
+
+
+def test_rtc_parallel_resume_passes_resume_all_with_arbitrary_gpu_list():
+    output = run(
+        "bash", str(TOOL / "scripts/run_rtc_fast_50x50.sh"),
+        "--model", "full15k", "--gpu-ids", "1,3,4",
+        "--resume-run-dir", "/tmp/run", "--resume-all", "--dry-run",
+    )
+    assert "--resume_run_dir /tmp/run" in output
+    assert "--resume_all" in output
+    assert "--gpu_ids 1\\,3\\,4" in output
+
+
+def test_rtc_parallel_resume_requires_a_run_directory():
+    result = subprocess.run(
+        [
+            "bash", str(TOOL / "scripts/run_rtc_fast_50x50.sh"),
+            "--resume-all", "--dry-run",
+        ],
+        cwd=ROOT, text=True, capture_output=True,
+    )
+    assert result.returncode == 2
+    assert "--resume-all requires --resume-run-dir" in result.stderr
+
+
+def test_rtc_parallel_resume_rejects_manual_per_task_resume_arguments():
+    result = subprocess.run(
+        [
+            "bash", str(TOOL / "scripts/run_rtc_fast_50x50.sh"),
+            "--resume-run-dir", "/tmp/run", "--resume-all",
+            "--resume-task", "lift_pot", "--dry-run",
+        ],
+        cwd=ROOT, text=True, capture_output=True,
+    )
+    assert result.returncode == 2
+    assert "cannot be combined" in result.stderr
+
+
+def test_low_level_launcher_has_per_task_parallel_resume_state():
+    text = (TOOL / "scripts/start_robotwin_rtc_infer_and_eval.sh").read_text()
+    assert "--resume_all" in text
+    assert "task_resume_episode_count" in text
+    assert "task_resume_success_count" in text
+    assert "task_resume_start_seed" in text
 
 
 def test_rtc_batch_accepts_arbitrary_non_contiguous_gpu_list():

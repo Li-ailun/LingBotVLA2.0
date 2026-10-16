@@ -71,6 +71,7 @@ instruction_type=""
 task_name=""
 render_freq=0
 resume_run_dir=""
+resume_all=false
 initial_episode_count=0
 initial_success_count=0
 start_seed=""
@@ -99,6 +100,7 @@ while [[ $# -gt 0 ]]; do
         --task_name)         task_name="$2";         shift 2 ;;
         --render_freq)       render_freq="$2";       shift 2 ;;
         --resume_run_dir)    resume_run_dir="$2";    shift 2 ;;
+        --resume_all)        resume_all=true;         shift ;;
         --initial_episode_count) initial_episode_count="$2"; shift 2 ;;
         --initial_success_count) initial_success_count="$2"; shift 2 ;;
         --start_seed)        start_seed="$2";        shift 2 ;;
@@ -198,6 +200,15 @@ if ! [[ "$num_episodes" =~ ^[1-9][0-9]*$ ]]; then
     exit 1
 fi
 
+if $resume_all && [ -z "$resume_run_dir" ]; then
+    echo "Error: --resume_all requires --resume_run_dir" >&2
+    exit 2
+fi
+if $resume_all && { [ -n "$task_name" ] || [ "$initial_episode_count" != "0" ] || [ "$initial_success_count" != "0" ] || [ -n "$start_seed" ]; }; then
+    echo "Error: --resume_all cannot be combined with manual per-task resume arguments" >&2
+    exit 2
+fi
+
 if $validate_only; then
     echo "num_tasks=${num_tasks}"
     echo "num_episodes=${num_episodes}"
@@ -211,6 +222,7 @@ if $validate_only; then
     echo "initial_success_count=${initial_success_count}"
     echo "start_seed=${start_seed}"
     echo "resume_run_dir=${resume_run_dir}"
+    echo "resume_all=${resume_all}"
     exit 0
 fi
 
@@ -303,23 +315,51 @@ policy_name=ACT
 train_config_name=0
 seed=0
 
-# ===== Compute inference slot count =====
-# actual slots = min(num_tasks, num_gpus * num_per_gpu)
-# When tasks < max concurrency, spin up only as many servers as tasks to avoid
-# the waste of starting then shutting down extras.
-num_slots=$(( num_gpus * num_per_gpu ))
-if [ "$num_tasks" -lt "$num_slots" ]; then
-    echo -e "\033[36mnum_tasks ${num_tasks} < max slots ${num_slots}; starting servers by task count\033[0m"
-    num_slots=$num_tasks
-fi
-
 # ===== Full task list (50) =====
 task_list_all=("lift_pot" "hanging_mug" "stack_bowls_three" "scan_object" "handover_block" "click_bell" "put_object_cabinet" "open_microwave" "stack_blocks_three" "place_shoe" "adjust_bottle" "beat_block_hammer" "blocks_ranking_rgb" "blocks_ranking_size" "click_alarmclock" "dump_bin_bigbin" "grab_roller" "handover_mic" "move_can_pot" "move_pillbottle_pad" "move_playingcard_away" "place_cans_plasticbox" "place_container_plate" "place_dual_shoes" "place_empty_cup" "place_fan" "place_mouse_pad" "place_object_basket" "place_object_scale" "place_object_stand" "place_phone_stand" "move_stapler_pad" "open_laptop" "pick_diverse_bottles" "pick_dual_bottles" "place_a2b_left" "place_a2b_right" "place_bread_basket" "place_bread_skillet" "place_burger_fries" "place_can_basket" "press_stapler" "rotate_qrcode" "shake_bottle_horizontally" "shake_bottle" "stack_blocks_two" "stack_bowls_two" "stamp_seal" "turn_switch" "put_bottles_dustbin")
 
 # Build the sim task queue
 task_queue=()
+declare -A task_resume_episode_count=()
+declare -A task_resume_success_count=()
+declare -A task_resume_start_seed=()
 task_start_index=0
-if [ -n "$task_name" ]; then
+if $resume_all; then
+    if [ ! -d "$resume_run_dir" ]; then
+        echo "Error: resume run directory not found: $resume_run_dir" >&2
+        exit 2
+    fi
+    resume_plan_base=(
+        "$sim_python" -m evaluation.eval_provenance.resume_plan
+        --run-dir "$resume_run_dir"
+        --mode "${LINGBOT_EVAL_MODE:-rtc}"
+        --model-id "${LINGBOT_MODEL_ID:?LINGBOT_MODEL_ID is required for --resume_all}"
+        --precision "${LINGBOT_PRECISION:?LINGBOT_PRECISION is required for --resume_all}"
+        --task-config "$task_config"
+        --instruction-type "$instruction_type"
+        --episodes "$num_episodes"
+    )
+    [ -n "${LINGBOT_RTC_REQUEST_INDEX:-}" ] && resume_plan_base+=(--request-index "$LINGBOT_RTC_REQUEST_INDEX")
+    [ -n "${LINGBOT_RTC_FIXED_DELAY_STEPS:-}" ] && resume_plan_base+=(--fixed-delay-steps "$LINGBOT_RTC_FIXED_DELAY_STEPS")
+    [ -n "${LINGBOT_RTC_EXECUTION_HORIZON:-}" ] && resume_plan_base+=(--execution-horizon "$LINGBOT_RTC_EXECUTION_HORIZON")
+    [ -n "${LINGBOT_RTC_CROSSFADE_STEPS:-}" ] && resume_plan_base+=(--crossfade-steps "$LINGBOT_RTC_CROSSFADE_STEPS")
+    [ -n "${LINGBOT_RTC_EMA_ALPHA:-}" ] && resume_plan_base+=(--ema-alpha "$LINGBOT_RTC_EMA_ALPHA")
+    resume_plan_command=("${resume_plan_base[@]}")
+    for task in "${task_list_all[@]}"; do
+        resume_plan_command+=(--task "$task")
+    done
+    if ! resume_plan_output=$(PYTHONPATH="${project_root}${PYTHONPATH:+:${PYTHONPATH}}" "${resume_plan_command[@]}"); then
+        echo "Error: automatic resume planning failed" >&2
+        exit 2
+    fi
+    while IFS=$'\t' read -r task count successes next_seed; do
+        [ -z "$task" ] && continue
+        task_queue+=("$task")
+        task_resume_episode_count[$task]="$count"
+        task_resume_success_count[$task]="$successes"
+        task_resume_start_seed[$task]="$next_seed"
+    done <<< "$resume_plan_output"
+elif [ -n "$task_name" ]; then
     task_start_index=-1
     for i in "${!task_list_all[@]}"; do
         if [ "${task_list_all[$i]}" = "$task_name" ]; then
@@ -332,11 +372,26 @@ if [ -n "$task_name" ]; then
         exit 1
     fi
 fi
-for i in $(seq "$task_start_index" $((task_start_index + num_tasks - 1))); do
-    [ "$i" -ge "${#task_list_all[@]}" ] && break
-    task_queue+=("${task_list_all[$i]}")
-done
+if ! $resume_all; then
+    for i in $(seq "$task_start_index" $((task_start_index + num_tasks - 1))); do
+        [ "$i" -ge "${#task_list_all[@]}" ] && break
+        task_queue+=("${task_list_all[$i]}")
+    done
+fi
 num_tasks=${#task_queue[@]}
+if [ "$num_tasks" -eq 0 ]; then
+    echo -e "\033[32mAll ${#task_list_all[@]} tasks already contain ${num_episodes} episodes; nothing to resume.\033[0m"
+    trap - EXIT
+    exit 0
+fi
+
+# ===== Compute inference slot count =====
+# actual slots = min(queued tasks, num_gpus * num_per_gpu)
+num_slots=$(( num_gpus * num_per_gpu ))
+if [ "$num_tasks" -lt "$num_slots" ]; then
+    echo -e "\033[36mnum_tasks ${num_tasks} < max slots ${num_slots}; starting servers by task count\033[0m"
+    num_slots=$num_tasks
+fi
 echo -e "\033[36mTasks this run (${num_tasks}): ${task_queue[*]}\033[0m"
 echo -e "\033[36mInference config: ${num_gpus} GPU x ${num_per_gpu} servers/GPU = ${num_slots} slots\033[0m"
 echo -e "\033[36mPhysical GPU ids: ${gpu_ids}\033[0m"
@@ -538,6 +593,25 @@ for t in "${task_queue[@]}"; do
     task_retries[$t]=0
 done
 
+refresh_task_resume_state() {
+    local task=$1
+    local state
+    local count successes next_seed
+    $resume_all || return 0
+    if ! state=$(PYTHONPATH="${project_root}${PYTHONPATH:+:${PYTHONPATH}}" "${resume_plan_base[@]}" --task "$task"); then
+        echo "Error: failed to refresh resume state for $task" >&2
+        return 2
+    fi
+    if [ -z "$state" ]; then
+        task_resume_episode_count[$task]="$num_episodes"
+        return 0
+    fi
+    IFS=$'\t' read -r _ count successes next_seed <<< "$state"
+    task_resume_episode_count[$task]="$count"
+    task_resume_success_count[$task]="$successes"
+    task_resume_start_seed[$task]="$next_seed"
+}
+
 # Launch a sim task onto a given slot
 launch_task() {
     local slot=$1
@@ -553,7 +627,11 @@ launch_task() {
     local task_initial_episode_count=0
     local task_initial_success_count=0
     local task_start_seed=""
-    if [ -n "$resume_run_dir" ] && [ "$task_name" = "${task_queue[0]}" ]; then
+    if $resume_all; then
+        task_initial_episode_count="${task_resume_episode_count[$task_name]}"
+        task_initial_success_count="${task_resume_success_count[$task_name]}"
+        task_start_seed="${task_resume_start_seed[$task_name]}"
+    elif [ -n "$resume_run_dir" ] && [ "$task_name" = "${task_queue[0]}" ]; then
         task_initial_episode_count=$initial_episode_count
         task_initial_success_count=$initial_success_count
         task_start_seed=$start_seed
@@ -686,6 +764,12 @@ while [ $((completed + skipped)) -lt $total_tasks ] && has_running; do
                     queue_idx=$((queue_idx + 1))
                 fi
             else
+                if $resume_all; then
+                    if ! refresh_task_resume_state "$task_name"; then
+                        echo -e "\033[31m  [abort] cannot safely refresh ${task_name} resume state\033[0m"
+                        exit 2
+                    fi
+                fi
                 task_retries[$task_name]=$((task_retries[$task_name] + 1))
                 if [ ${task_retries[$task_name]} -lt $max_retries ]; then
                     echo -e "\033[31m  [fail] ${task_name} slot $slot took ${task_duration}s exit=${exit_code}, retrying on this slot (${task_retries[$task_name]}/${max_retries})\033[0m"

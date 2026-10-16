@@ -1,4 +1,4 @@
-# LingBot 双模型评测适配
+# LingBot 多模型评测适配
 
 评测适配层只负责解析模型路径、资产路径、精度和结果目录，不修改或复制模型权重。
 
@@ -8,9 +8,14 @@
 |---|---|---|
 | `step2000` | `models/lingbot_action_step2000/` | 同一目录 |
 | `full5k` | `models/lingbot_full_5k_6_60/checkpoints/global_step_5000/hf_ckpt/` | `models/lingbot_full_5k_6_60/` |
+| `full15k` | `models/lingbot_15K/` | `models/lingbot_full_5k_6_60/` |
+| `full30k` | `models/lingbot_30K/`，或其 `checkpoints/global_step_30000/hf_ckpt/` | `models/lingbot_full_5k_6_60/` |
 
 解析逻辑位于 `evaluation/model_registry.sh`。`full5k` 直接读取原始 FP32
 safetensors；选择 BF16 时是在加载/推理阶段使用 BF16，不会生成或覆盖权重文件。
+`full15k`和`full30k`是同一full5k配置上的继续训练权重，因此复用full5k的
+归一化统计、机器人配置和训练配置。30K注册器会自动识别扁平HF导出和嵌套
+checkpoint导出；存在`.incomplete`分片时会拒绝启动。
 
 精度参数：
 
@@ -103,6 +108,23 @@ bash myscripts/simulation_rtc_tools/scripts/run_rtc_fast_50x50.sh \
 
 续跑时必须保持原模型、精度、setting 和 RTC 参数不变。`--resume-task` 从指定任务
 继续，并在完成后按官方任务顺序处理后续任务。
+
+RTC多卡自动断点续跑会读取每个任务的`episodes.jsonl`，跳过已经完成的任务，
+并把所有未完成任务分配给可用GPU：
+
+```bash
+bash myscripts/simulation_rtc_tools/scripts/run_rtc_fast_50x50.sh \
+  --model full30k --precision bf16 --episodes 50 \
+  --gpu-ids 1,3,4 \
+  --resume-run-dir /绝对路径/到/原运行目录 \
+  --resume-all \
+  --request-index 20 --fixed-delay-steps 10 \
+  --execution-horizon 20 --crossfade-steps 10 --ema-alpha 0.21
+```
+
+`--resume-all`不能和`--resume-task`、`--initial-episode-count`、
+`--initial-success-count`或`--start-seed`混用。自动模式会核对原运行的模型、精度、
+setting、指令类型、episode目标和RTC参数；记录损坏或配置不一致时会拒绝启动。
 
 ## 录像比较
 

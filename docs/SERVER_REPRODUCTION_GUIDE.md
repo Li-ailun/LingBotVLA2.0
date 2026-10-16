@@ -784,3 +784,128 @@ bash evaluation/lingbot_action_step2000/run_eval.sh \
 因此准确结论是：
 
 > 如果Conda环境和大型资产已经准备好，当前仓库可以快速、无需修改代码地复现；如果面对完全空白的新服务器，仍需安装两个Conda环境和CUDA相关编译依赖，尚未达到完全一键部署。
+
+## 17. full30k权重评测
+
+最新继续训练权重注册名为`full30k`，并兼容`30k`和`lingbot_30K`别名。权重放在：
+
+```text
+models/lingbot_30K/
+```
+
+注册器自动支持以下两种布局：
+
+```text
+models/lingbot_30K/config.json
+models/lingbot_30K/model.safetensors.index.json
+```
+
+或：
+
+```text
+models/lingbot_30K/checkpoints/global_step_30000/hf_ckpt/config.json
+models/lingbot_30K/checkpoints/global_step_30000/hf_ckpt/model.safetensors.index.json
+```
+
+full30k与full15k一样复用`models/lingbot_full_5k_6_60/`中的归一化统计、
+机器人配置和训练配置。权重下载未完成、关键文件缺失或目录中仍有
+`.incomplete`分片时，评测入口会直接报错，不会加载半成品权重。
+
+下载完成后的预检：
+
+```bash
+bash myscripts/simulation_rtc_tools/scripts/preflight.sh \
+  --model full30k \
+  --deep
+```
+
+本地单卡非RTC冒烟测试：
+
+```bash
+bash evaluation/lingbot_action_step2000/run_eval.sh \
+  demo_clean \
+  --model full30k \
+  --precision bf16 \
+  --task click_alarmclock \
+  --episodes 1 \
+  --gpu 0 \
+  --instruction-type unseen
+```
+
+服务器任意三卡RTC全量评测示例：
+
+```bash
+bash myscripts/simulation_rtc_tools/scripts/run_rtc_fast_50x50.sh \
+  --setting demo_randomized \
+  --model full30k \
+  --precision bf16 \
+  --episodes 50 \
+  --gpu-ids 1,3,4 \
+  --instruction-type unseen \
+  --request-index 20 \
+  --fixed-delay-steps 10 \
+  --execution-horizon 20 \
+  --crossfade-steps 10 \
+  --ema-alpha 0.21
+```
+
+本地与服务器使用同一套代码；单卡和多卡的差异仅是`--gpu`与
+`--gpu-ids`参数。结果分别写入`results/full30k/<precision>/<setting>/`，
+不会与full5k或full15k结果混在一起。
+
+## 18. 服务器多卡自动断点续跑
+
+RTC全量评测中断后，推荐使用`--resume-all`自动恢复整个运行目录。它会读取：
+
+```text
+<RUN>/eval_results/<task>/episodes.jsonl
+```
+
+并为每个任务独立恢复已完成数、成功数和下一个环境seed。完成目标episode数的任务
+不会重新运行，未开始和未完成的任务按官方任务顺序进入多卡队列。
+
+示例：使用GPU 1、3、4恢复full30k RTC评测：
+
+```bash
+cd <SERVER_ROOT>
+unset LD_LIBRARY_PATH
+unset ROBOTWIN_REALTIME_VISUALIZATION
+
+export CONDA_ENVS_PATH=/path/to/conda-envs
+export ROBOTWIN_PYTHON=/path/to/conda-envs/RoboTwin/bin/python
+export LINGBOTVLA_PYTHON=/path/to/conda-envs/lingbotvla/bin/python
+export RUN=/绝对路径/到/原运行目录
+
+bash myscripts/simulation_rtc_tools/scripts/run_rtc_fast_50x50.sh \
+  --setting demo_randomized \
+  --model full30k \
+  --precision bf16 \
+  --episodes 50 \
+  --gpu-ids 1,3,4 \
+  --instruction-type unseen \
+  --resume-run-dir "$RUN" \
+  --resume-all \
+  --request-index 20 \
+  --fixed-delay-steps 10 \
+  --execution-horizon 20 \
+  --crossfade-steps 10 \
+  --ema-alpha 0.21
+```
+
+启动前会把当前参数与`run_manifest.json`比较。模型、精度、RTC/non-RTC模式、
+clean/randomized、seen/unseen、episode目标或RTC参数不一致时直接停止，避免污染
+已有结果。每个任务的`episode_index`还必须从0连续且不重复。
+
+旧实验如果日志中已有成功率，但缺少`episodes.jsonl`，自动模式不会根据日志猜测
+断点；此时继续使用原来的单任务手动恢复参数。`--resume-all`不能与以下参数混用：
+
+```text
+--resume-task
+--initial-episode-count
+--initial-success-count
+--start-seed
+```
+
+多个worker写入成功episode汇总时由provenance文件锁保护。任务进程异常重试前会
+重新读取该任务的最新`episodes.jsonl`，因此已经在失败前落盘的episode不会被当成
+未完成进度重新计算。

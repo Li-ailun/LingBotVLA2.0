@@ -11,10 +11,10 @@ MODEL="step2000"
 DEEP=0
 while (($#)); do
   case "$1" in
-    --model) MODEL="${2:?--model requires step2000 or full5k}"; shift 2 ;;
+    --model) MODEL="${2:?--model requires step2000, full5k, full15k, or full30k}"; shift 2 ;;
     --deep) DEEP=1; shift ;;
     -h|--help)
-      echo "Usage: bash preflight.sh [--model step2000|full5k] [--deep]"
+      echo "Usage: bash preflight.sh [--model step2000|full5k|full15k|full30k] [--deep]"
       exit 0 ;;
     *) echo "Unknown option: $1" >&2; exit 2 ;;
   esac
