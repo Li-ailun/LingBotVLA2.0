@@ -82,6 +82,8 @@ def test_cli_exposes_recording_order_selection_options() -> None:
         (ord("2"), 2.0),
         (ord("5"), 5.0),
         (ord("0"), 10.0),
+        (ord("w"), 20.0),
+        (ord("f"), 50.0),
     ],
 )
 def test_playback_speed_shortcuts_match_displayed_rates(
@@ -96,6 +98,32 @@ def test_unrelated_key_does_not_change_playback_speed() -> None:
     module = _load()
 
     assert module.playback_rate_for_key(ord("n")) is None
+
+
+def test_normal_playback_advances_one_reference_frame() -> None:
+    module = _load()
+
+    assert module.next_reference_index((0.0, 0.1, 0.2, 0.3), 1, 10.0) == 2
+
+
+def test_fast_review_skips_to_timestamp_for_requested_rate() -> None:
+    module = _load()
+    timestamps = tuple(index / 15.0 for index in range(1000))
+
+    assert module.next_reference_index(timestamps, 0, 20.0) == 20
+    assert module.next_reference_index(timestamps, 0, 50.0) == 50
+
+
+def test_fast_review_always_moves_forward_at_end_of_stream() -> None:
+    module = _load()
+
+    assert module.next_reference_index((0.0, 0.1, 0.2), 1, 50.0) == 2
+
+
+def test_last_reference_frame_advances_past_end() -> None:
+    module = _load()
+
+    assert module.next_reference_index((0.0, 0.1, 0.2), 2, 50.0) == 3
 
 
 def test_quarantine_episode_moves_directory_and_records_manifest(tmp_path: Path) -> None:

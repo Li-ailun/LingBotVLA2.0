@@ -487,6 +487,80 @@ def find_episode_dirs(input_path: Path):
     raise RuntimeError(f"No episode_*/bag directories found under: {input_path}")
 
 
+def episode_relative_path(input_path: Path, episode_dir: Path) -> Path:
+    if episode_dir == input_path:
+        return Path(episode_dir.name)
+    return episode_dir.relative_to(input_path)
+
+
+def plan_resume(
+    episode_dirs: list[Path],
+    input_path: Path,
+    output_root: Path,
+) -> list[Path]:
+    """Validate existing intermediate data and return only new source episodes."""
+    input_path = Path(input_path).resolve()
+    output_root = Path(output_root).resolve()
+    source_by_relative = {
+        episode_relative_path(input_path, episode.resolve()): episode
+        for episode in episode_dirs
+    }
+    existing_by_relative = {
+        episode.relative_to(output_root): episode
+        for episode in sorted(output_root.rglob("episode_*"))
+        if episode.is_dir()
+    } if output_root.exists() else {}
+
+    stale = sorted(set(existing_by_relative) - set(source_by_relative))
+    if stale:
+        detail = "\n".join(f"  {path}" for path in stale)
+        raise RuntimeError(
+            "stale source episodes exist in intermediate output:\n"
+            f"{detail}\n"
+            "Source MCAP is missing or quarantined. Run again with --overwrite."
+        )
+
+    required_files = (
+        "episode_meta.json", "timestamps.npy", "state.npy", "action.npy", "task.txt"
+    )
+    required_camera_dirs = (
+        "images/cam_high", "images/cam_left_wrist", "images/cam_right_wrist"
+    )
+    for relative, episode in existing_by_relative.items():
+        missing = [name for name in required_files if not (episode / name).is_file()]
+        missing.extend(
+            name for name in required_camera_dirs if not (episode / name).is_dir()
+        )
+        if missing:
+            raise RuntimeError(
+                f"incomplete intermediate episode: {relative}\n"
+                f"Missing: {', '.join(missing)}\n"
+                "Run again with --overwrite."
+            )
+
+        try:
+            meta = json.loads((episode / "episode_meta.json").read_text())
+        except (OSError, json.JSONDecodeError) as exc:
+            raise RuntimeError(
+                f"invalid intermediate metadata: {relative}: {exc}\n"
+                "Run again with --overwrite."
+            ) from exc
+        if (
+            meta.get("source_episode_relative_path") != str(relative)
+            or meta.get("source_mcap_episode_name") != episode.name
+        ):
+            raise RuntimeError(
+                f"intermediate source mapping mismatch: {relative}\n"
+                "Run again with --overwrite."
+            )
+
+    existing = set(existing_by_relative)
+    return [
+        episode for relative, episode in source_by_relative.items()
+        if relative not in existing
+    ]
+
+
 def read_episode_instruction_metadata(episode_dir: Path) -> dict:
     cfg = {}
     cfg_file = episode_dir / "record_config.json"
@@ -756,7 +830,9 @@ def main():
     parser.add_argument("--fps", type=int, default=15)
     parser.add_argument("--max-image-dt", type=float, default=0.12)
     parser.add_argument("--max-vec-dt", type=float, default=0.20)
-    parser.add_argument("--overwrite", action="store_true")
+    output_mode = parser.add_mutually_exclusive_group()
+    output_mode.add_argument("--resume", action="store_true")
+    output_mode.add_argument("--overwrite", action="store_true")
     args = parser.parse_args()
 
     input_path = Path(args.input).expanduser().resolve()
@@ -768,6 +844,15 @@ def main():
 
     episode_dirs = find_episode_dirs(input_path)
     print(f"[INFO] Found {len(episode_dirs)} episodes")
+    episodes_to_convert = (
+        plan_resume(episode_dirs, input_path, output_root)
+        if args.resume else episode_dirs
+    )
+    if args.resume:
+        print(
+            f"[RESUME] Existing: {len(episode_dirs) - len(episodes_to_convert)}, "
+            f"new: {len(episodes_to_convert)}"
+        )
 
     manifest = {
         "input": str(input_path),
@@ -778,11 +863,8 @@ def main():
         "episodes": [],
     }
 
-    for episode_dir in episode_dirs:
-        if episode_dir == input_path:
-            relative_episode = Path(episode_dir.name)
-        else:
-            relative_episode = episode_dir.relative_to(input_path)
+    for episode_dir in episodes_to_convert:
+        relative_episode = episode_relative_path(input_path, episode_dir)
         output_episode_dir = output_root / relative_episode
         convert_episode(
             episode_dir,
@@ -790,6 +872,9 @@ def main():
             args,
             source_episode_relative_path=relative_episode,
         )
+    for episode_dir in episode_dirs:
+        relative_episode = episode_relative_path(input_path, episode_dir)
+        output_episode_dir = output_root / relative_episode
         episode_meta = read_episode_instruction_metadata(episode_dir)
         manifest["episodes"].append(
             {

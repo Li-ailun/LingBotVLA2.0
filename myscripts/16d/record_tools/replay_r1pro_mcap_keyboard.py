@@ -42,6 +42,8 @@ CAMERA_LABELS = {
 }
 EPISODE_RE = re.compile(r"^episode_(\d+)(?:_|$)")
 WINDOW_NAME = "R1Pro raw MCAP replay"
+FAST_REVIEW_THRESHOLD = 10.0
+FAST_REVIEW_DISPLAY_FPS = 15.0
 
 
 @dataclass(frozen=True)
@@ -318,7 +320,7 @@ def render_frame(
     line2 = (
         f"time={elapsed:.2f}/{duration:.2f}s  rate={rate:g}x  "
         "SPACE/p pause  n next  b previous  r replay  d remove  "
-        "1/2/5/0=1x/2x/5x/10x  q quit"
+        "1/2/5/0/w/f=1x/2x/5x/10x/20x/50x  q quit"
     )
     cv2.putText(footer, line1, (10, 26), cv2.FONT_HERSHEY_SIMPLEX, 0.62, (255, 255, 255), 2, cv2.LINE_AA)
     cv2.putText(footer, line2, (10, 57), cv2.FONT_HERSHEY_SIMPLEX, 0.52, (200, 255, 200), 1, cv2.LINE_AA)
@@ -373,7 +375,28 @@ def playback_rate_for_key(key: int) -> float | None:
         ord("2"): 2.0,
         ord("5"): 5.0,
         ord("0"): 10.0,
+        ord("w"): 20.0,
+        ord("f"): 50.0,
     }.get(key)
+
+
+def next_reference_index(
+    timestamps: tuple[float, ...],
+    current_index: int,
+    rate: float,
+) -> int:
+    """Advance one frame normally, or time-skip frames in fast-review mode."""
+    last_index = len(timestamps) - 1
+    if current_index >= last_index:
+        return len(timestamps)
+    if rate <= FAST_REVIEW_THRESHOLD:
+        return current_index + 1
+
+    target_time = timestamps[current_index] + rate / FAST_REVIEW_DISPLAY_FPS
+    return min(
+        last_index,
+        max(current_index + 1, bisect.bisect_left(timestamps, target_time)),
+    )
 
 
 def play_episode(
@@ -403,11 +426,14 @@ def play_episode(
             frame = render_delete_confirmation(frame, episode)
         cv2.imshow(WINDOW_NAME, frame)
 
-        if index + 1 < len(head):
+        if rate > FAST_REVIEW_THRESHOLD:
+            delay_ms = max(1, int(round(1000.0 / FAST_REVIEW_DISPLAY_FPS)))
+        elif index + 1 < len(head):
             frame_dt = max(0.001, head[index + 1].timestamp - head[index].timestamp)
+            delay_ms = max(1, int(round(frame_dt / rate * 1000.0)))
         else:
             frame_dt = 1.0 / 15.0
-        delay_ms = max(1, int(round(frame_dt / rate * 1000.0)))
+            delay_ms = max(1, int(round(frame_dt / rate * 1000.0)))
         key = cv2.waitKey(50 if paused or delete_armed else delay_ms) & 0xFF
 
         if delete_armed:
@@ -440,7 +466,7 @@ def play_episode(
             print(f"[RATE] {rate:g}x", flush=True)
 
         if not paused:
-            index += 1
+            index = next_reference_index(streams["head"].timestamps, index, rate)
 
     return "next", rate
 

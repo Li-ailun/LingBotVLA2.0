@@ -8,6 +8,41 @@ from pathlib import Path
 SCRIPT = Path(__file__).parents[1] / "convert_tools" / "export_r1pro_mcap_to_intermediate.py"
 
 
+def _raw_episode(root: Path, relative: str) -> Path:
+    episode = root / relative
+    (episode / "bag").mkdir(parents=True)
+    return episode
+
+
+def _intermediate_episode(root: Path, relative: str, *, complete: bool = True) -> Path:
+    episode = root / relative
+    episode.mkdir(parents=True)
+    if complete:
+        (episode / "episode_meta.json").write_text(json.dumps({
+            "source_episode_relative_path": relative,
+            "source_mcap_episode_name": episode.name,
+        }))
+        for name in ("timestamps.npy", "state.npy", "action.npy", "task.txt"):
+            (episode / name).write_text("test")
+        for camera in ("cam_high", "cam_left_wrist", "cam_right_wrist"):
+            (episode / "images" / camera).mkdir(parents=True)
+    return episode
+
+
+def _run_resume_plan(input_root: Path, output_root: Path) -> subprocess.CompletedProcess:
+    code = f"""
+import importlib.util,json
+s=importlib.util.spec_from_file_location('exporter',{str(SCRIPT)!r})
+m=importlib.util.module_from_spec(s);s.loader.exec_module(m)
+i=m.Path({str(input_root)!r});o=m.Path({str(output_root)!r})
+e=m.find_episode_dirs(i)
+print(json.dumps([str(p.relative_to(i)) for p in m.plan_resume(e,i,o)]))
+"""
+    return subprocess.run(
+        ["/usr/bin/python3", "-c", code], capture_output=True, text=True
+    )
+
+
 def test_exporter_builds_left_first_16d_state_and_action() -> None:
     code = f"""
 import importlib.util,json,numpy as np
@@ -123,3 +158,87 @@ print(json.dumps([str(p.relative_to(m.Path({str(tmp_path)!r}))) for p in paths])
         "stack_plates_and_cups/stack_plates_cups_01/episode_000000",
         "stack_plates_and_cups/stack_plates_cups_02/episode_000000",
     ]
+
+
+def test_resume_plan_returns_only_new_source_episodes(tmp_path: Path) -> None:
+    input_root = tmp_path / "raw"
+    output_root = tmp_path / "intermediate"
+    first = "stack_plates_and_cups/li/stack_plates_cups_01/episode_000001_stamp"
+    second = "stack_plates_and_cups/li/stack_plates_cups_01/episode_000002_stamp"
+    _raw_episode(input_root, first)
+    _raw_episode(input_root, second)
+    _intermediate_episode(output_root, first)
+
+    result = _run_resume_plan(input_root, output_root)
+
+    assert result.returncode == 0, result.stderr
+    assert json.loads(result.stdout) == [second]
+
+
+def test_resume_plan_rejects_intermediate_whose_source_is_gone(tmp_path: Path) -> None:
+    input_root = tmp_path / "raw"
+    output_root = tmp_path / "intermediate"
+    current = "stack_plates_and_cups/li/stack_plates_cups_01/episode_000001_stamp"
+    stale = "stack_plates_and_cups/li/stack_plates_cups_01/episode_000002_stamp"
+    _raw_episode(input_root, current)
+    _intermediate_episode(output_root, current)
+    _intermediate_episode(output_root, stale)
+
+    result = _run_resume_plan(input_root, output_root)
+
+    assert result.returncode != 0
+    assert "stale source episodes" in result.stderr
+    assert stale in result.stderr
+    assert "--overwrite" in result.stderr
+
+
+def test_resume_plan_rejects_incomplete_existing_episode(tmp_path: Path) -> None:
+    input_root = tmp_path / "raw"
+    output_root = tmp_path / "intermediate"
+    relative = "stack_plates_and_cups/li/stack_plates_cups_01/episode_000001_stamp"
+    _raw_episode(input_root, relative)
+    _intermediate_episode(output_root, relative, complete=False)
+
+    result = _run_resume_plan(input_root, output_root)
+
+    assert result.returncode != 0
+    assert "incomplete intermediate episode" in result.stderr
+    assert relative in result.stderr
+    assert "--overwrite" in result.stderr
+
+
+def test_resume_plan_rejects_source_mapping_mismatch(tmp_path: Path) -> None:
+    input_root = tmp_path / "raw"
+    output_root = tmp_path / "intermediate"
+    relative = "stack_plates_and_cups/li/stack_plates_cups_01/episode_000001_stamp"
+    _raw_episode(input_root, relative)
+    episode = _intermediate_episode(output_root, relative)
+    (episode / "episode_meta.json").write_text(json.dumps({
+        "source_episode_relative_path": (
+            "stack_plates_and_cups/liu/stack_plates_cups_01/episode_000001_stamp"
+        ),
+        "source_mcap_episode_name": episode.name,
+    }))
+
+    result = _run_resume_plan(input_root, output_root)
+
+    assert result.returncode != 0
+    assert "intermediate source mapping mismatch" in result.stderr
+    assert relative in result.stderr
+    assert "--overwrite" in result.stderr
+
+
+def test_resume_and_overwrite_are_mutually_exclusive(tmp_path: Path) -> None:
+    result = subprocess.run(
+        [
+            "/usr/bin/python3", str(SCRIPT),
+            "--input", str(tmp_path / "raw"),
+            "--output", str(tmp_path / "intermediate"),
+            "--resume", "--overwrite",
+        ],
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 2
+    assert "not allowed with argument" in result.stderr
